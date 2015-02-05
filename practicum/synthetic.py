@@ -27,9 +27,14 @@ under the License.
  DESCRIPTION:
  Implmementation of a graph-based medical decision support system.
 
+
+ TODO:
+  Consider http://docs.scipy.org/doc/scipy/reference/stats.html for all statistical functions
+
 """
 # PRE-USER SETUP
 import numpy as np
+import scipy
 
 ########### NOT USER EDITABLE ABOVE THIS POINT #################
 
@@ -39,6 +44,7 @@ NEODB = "http://192.168.121.134:7474/db/data"
 
 # SET RANDOM SEED 
 np.random.seed(5052015)
+scipy.random.seed(50502015)  # THIS MAY NOT BE RIGHT
 
 ## TRUTH DATA STATIC VARIABLES
 DIAGNOSES = 10000
@@ -100,176 +106,6 @@ NEODB = args.db
 
 
 ## EXECUTION
-class decision_support_system():
-    model = None  # in the form of a graph
-
-#    def new_model(self):
-#        """
-#        :return: Nothing
-#
-#        Takes nothing, returns an empty model for training.
-#        """
-#        pass
-
-    def load_model(self, model = NEODB):
-        """
-
-        :param model: Neo4j database URI as string
-        :return: booling success
-
-        Takes a string refering to to a neo4j database and save the database handle to the class
-        """
-        try:
-            self.model = py2neoGraph(model)
-            logging.info("Model Loaded.")
-            return True
-        except exception as e:
-            logging.error(e.__str__)
-            logging.info("Model failed to load.")
-            return False
-
-
-    def sign_symptom_training(self, sign_symptom_map):
-        """
-
-        :param sign_symptom_map: dictionary of keys of diagnosis and list of tuples of (signs/symptoms, confidence, value)  (value is only used for continuous variables)
-        :return: booling success
-
-        Takes a single mapping of a sign/symptom to a diagnosis adds it to the Model
-        """
-        pass  # TODO
-        #  TODO : For continuous variables, the total for that variable (regardless of relation to the diagnosis), may need to be kept to normalize Y axis.
-
-        # TODO: (Need a way to categorize signs/symptoms as continuous, factors, or bool)
-
-        # TODO: if needed, create the sign/symptom & label it's type (sign or symptom), it's class (factor, continuous, or bool)
-
-        # TODO: If needed, create a diagnosis
-
-        # TODO: if it doesn't exist, create an edge between the sign/symptom and the diagnosis.  Create initial confidence (factor table, function, or bool)
-        # TODO:  If you cannot incrimentally update, the model will need to keep the entire value set and at the end build a distribution for each of the continuous variables
-
-        # TODO: if it already exists update the confidence (factor table, function, or bool count)
-
-        # NOTE: sign/symptom - diagnosis relationships may be negative in confidence indicating a lacking.  However negative and positive relationships should have their own edges.
-
-
-    def test_symptom_training(self, test_symptom_map):
-        """
-
-        :param test_symptom_map: dictionary of keys of tests and list of tuples of (symptoms, confidence)
-        :return: booling success
-
-        Takes a single mapping of a sign/symptom to a diagnosis adds it to the Model
-        """
-        pass  # TODO
-
-
-    def diagnosis_treatment_training(self, diagnosis_treatment_map):
-        """
-
-        :param diagnosis_treatment_map: dictionary of keys of treatment and values of (diagnosis, impact)
-        :return: booling success
-
-        Takes a single mapping of a treatment to diganosis and adds it to the Model
-        """
-        pass  # TODO
-
-
-    def query(self, signs_symptoms):
-        """
-
-        : param signs_symptoms: A list of signs and/or symptoms
-        : return: a dictionary of form {diagnoses: {diagnosis: score}, tests:{test: score}, treatments:{treatment:score}}
-        """
-
-        d = {}
-        d['diagnosis'] = query_diagnosis(signs_symptoms)
-        d['test'] = query_test(d['diagnosis'])
-        d['treatements'] = query_treatments(d['diagnosis'])
-
-        return d
-
-
-    def query_diagnosis(self, signs_symptoms):
-        """
-
-        : param signs_symptoms: A list of signs and/or symptoms
-        : return: a dictionary of form {diagnosis: score}
-        """
-        pass  # TODO
-        # TODO: Get all signs & symptoms from graph
-
-        # TODO: Get all out edges associated with each sign/symptom
-
-        # TOOD: If necessary, calculate distribution
-
-        # TODO: Normalize to out degree (bool) or feature/distribution (categorical/conditnuous) # May be done during import, but only 
-
-        # TODO: Find the single value of categorical/continuous signs/symptoms as confidence
-
-        # TOOD: sum the confidence by destination of each edge
-
-        # TODO: find all edges into the diagnosis.  Reduce the confidence summation of each diagnosis by the sum of the confidences of it's missing edges.
-
-        # TODO: Return the diagnosis:score dictionary
-
-    def query_test(self, diagnoses):
-        """
-
-        : param diagnoses: a dictionary of diagnoses and scores associated with their likelihood
-        : return: a dictionary of form {test: score}
-        """
-        pass  # TODO
-
-
-    def query_treatments(self, diagnoses):
-        """
-
-        : param diagnoses: a dictionary of diagnoses and scores associated with their likelihood
-        : return: a dictionary of form {treatment:score}
-        """
-        pass  # TODO
-
-
-    def validate_model(sign_symptoms, actual):
-        """
-
-        : param sign_symptoms: a list of lists of signs/symptoms
-        : param actual: a list of actual diagnosis
-        : return: a list of bools representing whether the actual diagnosis was in the top 5 diagnoses
-        """
-        pass  # TODO
-
-        diagnosis = self.query_diagnosis(signs_symptoms)
-
-        # TODO: Sort the diagnosis by score
-
-        # TODO: If the diagnosis is the top diagnosis, incriment the top1 counter
-        
-        # TODO: if the diagnosis is in the top 5, increment the top5 counter
-        
-        # TODO: Increment the total counter
-
-        # TODO: Return the 1% and 5% precisions.  (Could we also calculate recall?)
-
-
-# TODO:  Decide what type of GUI if any to build.  Options include API and webapp.  API would be pretty easy.
-class ui(Resource):
-    args = None
-    g = None
-
-    def __init__(self):
-        print "Loading Graph."
-        self.api_parser = parser
-        # TODO: Load connection to graph
-        print "Graph loaded."
-
-
-    def post(self):
-        self.args = self.parser.parse_args()
-        # ToDO: Parse args and do something
-
 class test_data():
     truth = None
     dists = None
@@ -283,6 +119,7 @@ class test_data():
             "log": self.dist_log,
             "normal": self.dist_normal
         }
+
 
 
     def dist_step(self, x, levels):
@@ -335,9 +172,11 @@ class test_data():
 
 
     def dist_normal(self, x, mean=0, sd=1):
-        return ((1/(sd * np.sqrt(2 * np.pi)) * np.exp(-((x-mean)**2/(2 * sd)**2)) / 
-                (1/(sd * np.sqrt(2 * np.pi)) * np.exp(-((mean-mean)**2/(2 * sd)**2)))  #  Normalize so max value is 1
-
+        return ((1/(sd * np.sqrt(2 * np.pi)) * np.exp(-((x-mean)**2/(2 * sd)**2))) /
+                (1/(sd * np.sqrt(2 * np.pi)) * np.exp(-((mean-mean)**2/(2 * sd)**2))))  #  Normalize so max value is 1
+        # TODO: Consider replacing with rv = scipy.stats.norm(loc=0, scale=1) # I think loc=mean and scale=SD
+        #         return rv.rvs(size=1)
+        # http://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.norm.html#scipy.stats.norm
 
     def diagnosis_struct(self):
         return {'signs':{}, 'symptoms':{}}
@@ -425,7 +264,7 @@ class test_data():
                         factors = {'inverse': True}
                     f_type = 'categorical'
                 elif function == 'step_3':
-                     if np.random.binomial(1, .5):
+                    if np.random.binomial(1, .5):
                         factors = {'levels': [-1, .5, 1]}
                     else:
                         factors = {'levels': [1, .5, -1]}
@@ -459,7 +298,7 @@ class test_data():
                         factors = {'inverse': True}
                     f_type = 'categorical'
                 elif function == 'step_3':
-                     if np.random.binomial(1, .5):
+                    if np.random.binomial(1, .5):
                         factors = {'levels': [-1, .5, 1]}
                     else:
                         factors = {'levels': [1, .5, -1]}
@@ -487,20 +326,80 @@ class test_data():
 
         return truth
 
-    def create_diagnosis_data(self, truth_data, SnS_dist = (SNSmedian, SNSSD)):
+# noinspection PyUnreachableCode
+def create_diagnosis_data(self, truth_data, records, SnS_dist = (SNSmedian, SNSSD), pct_true_sign=.99, pct_true_symptom=.95):
         """
 
-        :param truth data: a dictionary of {diagnosis: [list of signs and symptoms]} representing ground trouth
+        :param truth data: a dictionary of {diagnosis: [list of signs and symptoms]} representing ground truth
+        :param records: integer representing the number of records to generate
         :param SnS_dist: the median and standard distribution of the number of signs and symptoms in a normal chart
+        :param pct_true_sign: float representing the percentage of signs which will be from those associated with the diagnosis
+        :param pct_true_symptom: float representing the percentage of symptoms which will be from those associated with the diagnosis
         :return: a dictionary of {diagnosis: [list of signs and symptoms]} picked probabilistically to create the requested distribution
 
         NOTE: The returned dictionary will pick signs and symptoms so that false signs/symptoms are outliers, but will add false positives
         NOTE: The returned dictionary will use preferential attachment for both true and false positive signs and symptoms.
         """
-        pass  # TODO: create diagnosis-to symptom mappings probabilistically based on truth data
+        # Generate the baseline function used to decide whether to add a true or a false sign/symptom to the record
+        baseline = scipy.stats.halfnorm(loc=0, scale=1)  # mean of 0, SD of 1  call with size=X to return X values that fit the distribution
+
+        # Create the records holder
+        synthetic_records = list()
+
+        # Convert the percent true to a cutoff.
+        cutoff_sign = baseline.ppf(pct_true_sign)
+        cutoff_symptom = baseline.ppf(pct_true_symptom)
+
+        # Generate the default diagnosis from the truth data.  This will be used for the factors for false signs/symptoms
+        pass # TODO
 
 
+        for record in range(records):
+            # Choose a diagnosis from the truth data
+            pass # TODO
 
+            # choose a number of symptoms based on marcus's numbers
+            pass # TODO
+
+            # choose a number of signs based marcus's numbers
+            pass # TODO
+        
+            for sign in record_signs:
+                if sign in 'continuous':  # TODO
+                    # pick a random number
+                    pass  # TODO
+                    # pick a value out of the distribution for the sign based on the random number
+                    pass  # TODO
+                
+                else:  # sign is
+                    # choose if true or false
+                    # pick a random number.  If it is above the cutoff, pick a random false sign w/ the default diagnosis factors
+                    #  If it is at or below the cutoff, pick a true sign/symptom
+                    #    Pick the level with a normal distribution weighted towards the true side
+                    pass  # TODO
+                # Store the sign and value in the record
+                pass  # TODO
+            
+            for symptom in record_symptoms:
+                if symptom in 'continuous':  # TODO
+                    # pick a random number
+                    pass  # TODO
+                    # pick a value out of the distribution for the symptom based on the random number
+                    pass  # TODO
+                
+                else:  # symptom is
+                    # choose if true or false
+                    # pick a random number.  If it is above the cutoff, pick a random false symptom w/ the default diagnosis factors
+                    #  If it is at or below the cutoff, pick a true symptom/symptom
+                    #    Pick the level with a normal distribution weighted towards the true side
+                    pass  # TODO
+                # Store the symptom and value in the record
+                pass  # TODO
+
+            # Store record to list of records
+            pass # todo
+
+        return synthetic_records
 
 
 def main():
