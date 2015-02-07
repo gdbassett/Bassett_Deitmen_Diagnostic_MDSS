@@ -44,7 +44,6 @@ NEODB = "http://192.168.121.134:7474/db/data"
 
 # SET RANDOM SEED 
 np.random.seed(5052015)
-scipy.random.seed(50502015)  # THIS MAY NOT BE RIGHT
 
 ## TRUTH DATA STATIC VARIABLES
 DIAGNOSES = 10000
@@ -58,6 +57,10 @@ PERCENT_CONTINUOUS_SIGNS = 0.05
 PERCENT_CONTINUOUS_SYMPTOMS = 0.05
 PREFERENTIALLY_ATTACH_SIGNS = True
 PREFERENTIALLY_ATTACH_SYMPTOMS = False
+SYMPTOMS_PER_CHART_MEAN = 5
+SYMPTOMS_PER_CHART_SD = .6
+SIGNS_PER_CHART_MEAN = 2.5
+SIGNS_PER_CHART_SD = .3
 
 
 ## RECORDS STATIC VARIABLES
@@ -356,15 +359,15 @@ def create_diagnosis_data(self, truth_data, records, SnS_dist = (SNSmedian, SNSS
 
         for record in range(records):
             # Choose a diagnosis from the truth data
-            pass # TODO
+            diagnosis = np.random.choice(truth_data.keys())
 
             # choose a number of symptoms based on marcus's numbers
-            pass # TODO
+            num_symptoms = round(scipy.stats.norm.rvs(loc=SYMPTOMS_PER_CHART_MEAN, scale=SYMPTOMS_PER_CHART_SD))
 
             # choose a number of signs based marcus's numbers
-            pass # TODO
+            num_signs = round(scipy.stats.norm.rvs(loc=SIGNS_PER_CHART_MEAN, scale=SIGNS_PER_CHART_SD))
         
-            for sign in record_signs:
+            for sign in num_signs:
                 if sign in 'continuous':  # TODO
                     # pick a random number
                     pass  # TODO
@@ -380,7 +383,7 @@ def create_diagnosis_data(self, truth_data, records, SnS_dist = (SNSmedian, SNSS
                 # Store the sign and value in the record
                 pass  # TODO
             
-            for symptom in record_symptoms:
+            for symptom in num_symptoms:
                 if symptom in 'continuous':  # TODO
                     # pick a random number
                     pass  # TODO
