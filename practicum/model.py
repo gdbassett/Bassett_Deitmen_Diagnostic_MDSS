@@ -27,6 +27,9 @@ under the License.
  DESCRIPTION:
  Implmementation of a graph-based medical decision support system.
 
+ CAVEAT:
+ - The model assumes that signs and symptoms are known to be continuous or categorical and one-sided (bool & log), 2-sided (normal & 3-level), or progressive (linear & 10-step)
+
 """
 # PRE-USER SETUP
 import numpy as np

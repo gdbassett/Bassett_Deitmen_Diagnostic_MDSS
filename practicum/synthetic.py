@@ -29,12 +29,13 @@ under the License.
 
 
  TODO:
-  Consider http://docs.scipy.org/doc/scipy/reference/stats.html for all statistical functions
+  -Consider http://docs.scipy.org/doc/scipy/reference/stats.html for all statistical functions
+  -Add provide a continuous linear distribution for signs/symptoms in addition to normal and cumulative density (referred to as log in code)
 
 """
 # PRE-USER SETUP
 import numpy as np
-import scipy
+import scipy.stats
 
 ########### NOT USER EDITABLE ABOVE THIS POINT #################
 
@@ -124,7 +125,6 @@ class test_data():
         }
 
 
-
     def dist_step(self, x, levels):
         return levels[x-1]
 
@@ -184,7 +184,49 @@ class test_data():
     def diagnosis_struct(self):
         return {'signs':{}, 'symptoms':{}}
 
-    def create_truth_data(self):
+
+    def get_factors_and_type(self, function):
+        """
+
+        :param self:
+        :param function: a type of distribution used for signs/symptoms
+        :return: factors for that distribution and the type of distribution (continuous or categorical)
+        """
+        if function == 'bool':
+            if np.random.binomial(1, .5):
+                factors = {'inverse': False}
+            else:
+                factors = {'inverse': True}
+            f_type = 'categorical'
+        elif function == 'step_3':
+            if np.random.binomial(1, .5):
+                factors = {'levels': [-1, .5, 1]}
+            else:
+                factors = {'levels': [1, .5, -1]}
+            f_type = 'categorical'
+        elif function == 'step_10':
+            if np.random.binomial(1, .5):
+                factors = {'levels': [.1, .2, .3, .4, .5, .6, .7, .8, .9, 1]}
+            else:
+                factors = {'levels': [1, .9, .8, .7, .6, .5, .4, .3, .2, .1]}
+            f_type = 'categorical'
+        elif function == 'log':
+            if np.random.binomial(1, .5):
+                factors = {'pos': True}
+            else:
+                factors = {'pos': False}
+            f_type = 'continuous'
+        elif function == 'normal':
+            # Randomly choose a mean between -1 and 1 and SD between 0.2 and 1
+            factors = {'mean': np.random.sample() * 2 - 1, 'sd': np.random.sample() * .8 + .2}
+            f_type = 'continuous'
+        else:
+            raise KeyError("Function not found in functions list.")
+
+        return factors, f_type
+
+
+    def create_truth_data(self, default_diagnosis=True):
         """
         
         :param signs_symptoms: a list of all potential signs and symptoms
@@ -260,91 +302,55 @@ class test_data():
         for diagnosis in truth.keys():
             for sign in truth[diagnosis]:
                 function =  truth[diagnosis]['signs'][sign]['function']
-                if function == 'bool':
-                    if np.random.binomial(1, .5):
-                        factors = {'inverse': False}
-                    else:
-                        factors = {'inverse': True}
-                    f_type = 'categorical'
-                elif function == 'step_3':
-                    if np.random.binomial(1, .5):
-                        factors = {'levels': [-1, .5, 1]}
-                    else:
-                        factors = {'levels': [1, .5, -1]}
-                    f_type = 'categorical'
-                elif function == 'step_10':
-                    if np.random.binomial(1, .5):
-                        factors = {'levels': [.1, .2, .3, .4, .5, .6, .7, .8, .9, 1]}
-                    else:
-                        factors = {'levels': [1, .9, .8, .7, .6, .5, .4, .3, .2, .1]}
-                    f_type = 'categorical'
-                elif function == 'log':
-                    if np.random.binomial(1, .5):
-                        factors = {'pos': True}
-                    else:
-                        factors = {'pos': False}
-                    f_type = 'continuous'
-                elif function == 'normal':
-                    # Randomly choose a mean between -1 and 1 and SD between 0.2 and 1
-                    factors = {'mean': np.random.sample() * 2 - 1, 'sd': np.random.sample() * .8 + .2}
-                    f_type = 'continuous'
-                else:
-                    raise KeyError("Sign Function not found in functions list.")
+                factors, f_type = self.get_factors_and_type(function)
                 truth[diagnosis]['signs'][sign]['factors'] = factors
                 truth[diagnosis]['signs'][sign]['function_type'] = f_type
+
             for symptom in truth[diagnosis]:
                 function =  truth[diagnosis]['symptoms'][symptom]['function']
-                if function == 'bool':
-                    if np.random.binomial(1, .5):
-                        factors = {'inverse': False}
-                    else:
-                        factors = {'inverse': True}
-                    f_type = 'categorical'
-                elif function == 'step_3':
-                    if np.random.binomial(1, .5):
-                        factors = {'levels': [-1, .5, 1]}
-                    else:
-                        factors = {'levels': [1, .5, -1]}
-                    f_type = 'categorical'
-                elif function == 'step_10':
-                    if np.random.binomial(1, .5):
-                        factors = {'levels': [.1, .2, .3, .4, .5, .6, .7, .8, .9, 1]}
-                    else:
-                        factors = {'levels': [1, .9, .8, .7, .6, .5, .4, .3, .2, .1]}
-                    f_type = 'categorical'
-                elif function == 'log':
-                    if np.random.binomial(1, .5):
-                        factors = {'pos': True}
-                    else:
-                        factors = {'pos': False}
-                    f_type = 'continuous'
-                elif function == 'normal':
-                    # Randomly choose a mean between -1 and 1 and SD between 0.2 and 1
-                    factors = {'mean': np.random.sample() * 2 - 1, 'sd': np.random.sample() * .8 + .2}
-                    f_type = 'continuous'
-                else:
-                    raise KeyError("Sign Function not found in functions list.")
+                factors, f_type = self.get_factors_and_type(function)
                 truth[diagnosis]['symptoms'][symptom]['factors'] = factors
                 truth[diagnosis]['symptoms'][symptom]['function_type'] = f_type
 
-        return truth
+        # If 'default_diagnosis' is set, create and return a diagnosis that includes all signs and symptoms
+        if default_diagnosis:
+            default = self.diagnosis_struct()
+            for sign in signs:
+                factors, f_type = self.get_factors_and_type(distributions[sign])
+                default['signs'][sign]['factors'] = factors
+                default['signs'][sign]['function_type'] = f_type
+            for symptom in symptoms:
+                factors, f_type = self.get_factors_and_type(distributions[symptom])
+                default['symptoms'][symptom]['factors'] = factors
+                default['symptoms'][symptom]['function_type'] = f_type
+
+        # Return
+        if default_diagnosis:
+            return truth, default
+        else:
+            return truth
+
+
 
 # noinspection PyUnreachableCode
-def create_diagnosis_data(self, truth_data, records, SnS_dist = (SNSmedian, SNSSD), pct_true_sign=.99, pct_true_symptom=.95):
+def create_diagnosis_data(self, truth_data, records, default_diagnosis, pct_true_sign=.99, pct_true_symptom=.95):
         """
 
         :param truth data: a dictionary of {diagnosis: [list of signs and symptoms]} representing ground truth
         :param records: integer representing the number of records to generate
-        :param SnS_dist: the median and standard distribution of the number of signs and symptoms in a normal chart
-        :param pct_true_sign: float representing the percentage of signs which will be from those associated with the diagnosis
+        :param pct_true_sign: float representing the percentage of signs which will be from those associated with the diagnosis.
         :param pct_true_symptom: float representing the percentage of symptoms which will be from those associated with the diagnosis
         :return: a dictionary of {diagnosis: [list of signs and symptoms]} picked probabilistically to create the requested distribution
 
         NOTE: The returned dictionary will pick signs and symptoms so that false signs/symptoms are outliers, but will add false positives
+        NOTE: pct_true_sign/pct_true_symptom choose both the number of true/false signs/symptoms, but also, the likelihood that boolean signs/symptoms will be true/false
+        NOTE:   Non-boolean signs/symptoms will be chosen over a half-normal or normal distribution with the mean set at the correct value & 3SD set at the bottom of the range of potential values, (or not set at all for the actual normally distributed signs/symptoms)
         NOTE: The returned dictionary will use preferential attachment for both true and false positive signs and symptoms.
         """
         # Generate the baseline function used to decide whether to add a true or a false sign/symptom to the record
-        baseline = scipy.stats.halfnorm(loc=0, scale=1)  # mean of 0, SD of 1  call with size=X to return X values that fit the distribution
+        mean = 0
+        SD = 1
+        baseline = scipy.stats.halfnorm(loc=mean, scale=SD)  # mean of 0, SD of 1  call with size=X to return X values that fit the distribution
 
         # Create the records holder
         synthetic_records = list()
@@ -353,13 +359,12 @@ def create_diagnosis_data(self, truth_data, records, SnS_dist = (SNSmedian, SNSS
         cutoff_sign = baseline.ppf(pct_true_sign)
         cutoff_symptom = baseline.ppf(pct_true_symptom)
 
-        # Generate the default diagnosis from the truth data.  This will be used for the factors for false signs/symptoms
-        pass # TODO
-
-
         for record in range(records):
+            record = default_diagnosis()
+            record['diagnosis']
+
             # Choose a diagnosis from the truth data
-            diagnosis = np.random.choice(truth_data.keys())
+            record['diagnosis'] = np.random.choice(truth_data.keys())
 
             # choose a number of symptoms based on marcus's numbers
             num_symptoms = round(scipy.stats.norm.rvs(loc=SYMPTOMS_PER_CHART_MEAN, scale=SYMPTOMS_PER_CHART_SD))
@@ -368,39 +373,84 @@ def create_diagnosis_data(self, truth_data, records, SnS_dist = (SNSmedian, SNSS
             num_signs = round(scipy.stats.norm.rvs(loc=SIGNS_PER_CHART_MEAN, scale=SIGNS_PER_CHART_SD))
         
             for sign in num_signs:
-                if sign in 'continuous':  # TODO
-                    # pick a random number
-                    pass  # TODO
-                    # pick a value out of the distribution for the sign based on the random number
-                    pass  # TODO
-                
-                else:  # sign is
-                    # choose if true or false
-                    # pick a random number.  If it is above the cutoff, pick a random false sign w/ the default diagnosis factors
-                    #  If it is at or below the cutoff, pick a true sign/symptom
-                    #    Pick the level with a normal distribution weighted towards the true side
-                    pass  # TODO
-                # Store the sign and value in the record
-                pass  # TODO
-            
-            for symptom in num_symptoms:
-                if symptom in 'continuous':  # TODO
-                    # pick a random number
-                    pass  # TODO
-                    # pick a value out of the distribution for the symptom based on the random number
-                    pass  # TODO
-                
-                else:  # symptom is
-                    # choose if true or false
-                    # pick a random number.  If it is above the cutoff, pick a random false symptom w/ the default diagnosis factors
-                    #  If it is at or below the cutoff, pick a true symptom/symptom
-                    #    Pick the level with a normal distribution weighted towards the true side
-                    pass  # TODO
-                # Store the symptom and value in the record
-                pass  # TODO
+                # If a random number is below the cutoff, choose a correct sign
+                #  Second qualification is to ensure we don't duplicate true signs
+                if baseline.rvs() < cutoff_sign and len(record['signs']) < len(truth_data[record['diagnosis']]['signs']):
+                    sign = np.random.choice(truth_data[record['diagnosis']]['signs'].keys())
+                    factors = truth_data[record['diagnosis']]['signs'][sign]['factors']
+                    # if the sign is normal
+                    if truth_data[record['diagnosis']]['signs'][sign]['function'] == 'normal':
+                        val = scipy.stats.halfnorm(loc=factors['mean'], scale=factors['sd'])
+                        record['diagnosis']['signs'][sign] = val
+                    elif truth_data[record['diagnosis']]['signs'][sign]['function'] == 'log':
+                        # LOG is really the cumulative density function of the norm.
 
-            # Store record to list of records
-            pass # todo
+                        if truth_data[record['diagnosis']]['signs'][sign]['pos']:
+                            # the mean of the halfnorm needs to be at 3 (3 SD) and the tail needs to be negative
+                            # we are going to take a halfnorm dist.  For positive, we'll center (start) at 3SD (3) and
+                            #   _subtract_ the dist from the mean (3) giving us a reverse distribution
+                            #  We add 2 * 3SD where SD = 1 to move the start of the half-norm to +3SD going backwards
+                            intermediate_val = 6*SD - scipy.stats.halfnorm(loc=3*SD).rvs() # (to recenter at the top of the CDF)
+                            val = scipy.stats.norm().cdf(intermediate_val)
+                            record['diagnosis']['signs'][sign] = val
+                        else:
+                            # for a negative distribution, we'll center (start/mean) the halfnorm -3SD (-3). No need
+                            #  to subract since it's going forward
+                            intermediate_val = scipy.stats.halfnorm(loc=-3*SD).rvs() # (to recenter at the top of the CDF)
+                            val = scipy.stats.norm().cdf(intermediate_val)
+                            record['diagnosis']['signs'][sign] = val
+                    # If it's boolean, pick whether the value will be correct or incorrect and assign it
+                    elif truth_data[record['diagnosis']]['signs'][sign]['function'] == 'bool':
+                        # pick the correct value
+                        if baseline.rvs() < cutoff_sign:
+                            if truth_data[record['diagnosis']]['signs'][sign]['inverse']:
+                                record['diagnosis']['signs'][sign] = 0
+                            else:
+                                record['diagnosis']['signs'][sign] = 1
+                        # pick the incorrect value
+                        else:
+                            if truth_data[record['diagnosis']]['signs'][sign]['inverse']:
+                                record['diagnosis']['signs'][sign] = 1
+                            else:
+                                record['diagnosis']['signs'][sign] = 0
+                    # for 3 levels, the bottom level is negative, the middle is 0 and the top is positive
+                    #  Because of this we assign based on SD
+                    elif truth_data[record['diagnosis']]['signs'][sign]['function'] == 'step_3':
+                        # Pick a random value.
+                        intermediate_val = baseline.rvs()
+                        #  If the value is within 1SD, assign it the first level,
+                        if intermediate_val >= cutoff_sign / float(3*SD): # since cutoff is 3SD, divide it by 3
+                            val = truth_data[record['diagnosis']]['signs'][sign]['levels'][0]
+                        #  If it's > 3SD, assign it the 3rd level
+                        elif intermediate_val > cutoff_sign:
+                            val = truth_data[record['diagnosis']]['signs'][sign]['levels'][2]
+                        #  If it's between 1 and 3SD, assign it the 2nd level
+                        else:
+                            val = truth_data[record['diagnosis']]['signs'][sign]['levels'][1]
+                        record['diagnosis']['signs'][sign] = val
+                    elif truth_data[record['diagnosis']]['signs'][sign]['function'] == 'step_10':
+                        # choose a value.
+                        intermediate_val = baseline.rvs()
+                        #Divide the space between the mean and 3SD evenly between 9 levels
+                        rng = (cutoff_sign - mean) / float(9) # 9 is the number of samples less than 3SD
+                        lvl = int(intermediate_val/rng)
+                        # assign based on the bucket of the range
+                        # if it's over 3SD, assign the 10th level
+                        val = truth_data[record['diagnosis']]['signs'][sign]['levels'][lvl]
+                        record['diagnosis']['signs'][sign] = val
+                    else:
+                        raise KeyError("Function not found in functions list.")
+
+                else:
+                    pass # TODO: Pick something from the false signs
+
+                records.append(record)
+
+            for symptom in num_symptoms:
+                pass # repeat everything above for symptoms
+
+
+
 
         return synthetic_records
 
