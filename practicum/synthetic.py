@@ -226,6 +226,91 @@ class test_data():
         return factors, f_type
 
 
+    def get_sign_or_symptom_value(self, diagnosis, sign_or_symptom, cutoff, baseline=None, mean=0, SD=1):
+        """
+
+        :param diagnosis: a truth-data diagnosis
+        :param sign_or_symptom: Either "sign" or "symptom"
+        :param cutoff: the cutoff to use for outliers (generally for false positives)
+        :param baseline: a scipy.stats halfnorm frozen distribution  used heavily for picking values
+        :param mean: the location of the halfnorm max value (normally 0)
+        :param SD: the scale of the halfnorm distribution (normally 1)
+        :return: a sign or symptom from the diagnosis and a value for it
+        """
+        # Allow for some default properties of baseline, mean, and SD
+        if baseline is None:
+            baseline = scipy.stats.halfnorm(loc=mean, scale=SD)
+
+        if sign_or_symptom is "sign":
+            s = np.random.choice(diagnosis['signs'].keys())
+        elif sign_or_symptom is 'symptom':
+            s = np.random.choice(diagnosis['symptoms'].keys())
+        else:
+            raise ValueError("sign_or_symptom must be 'sign' or 'symptom'")
+        factors = diagnosis[sign_or_symptom + "s"][s]['factors']
+        # if the sign is normal
+        if diagnosis[sign_or_symptom + "s"][s]['function'] == 'normal':
+            val = scipy.stats.halfnorm(loc=factors['mean'], scale=factors['sd'])
+            diagnosis[sign_or_symptom + "s"][s] = val
+        elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'log':
+            # LOG is really the cumulative density function of the norm.
+
+            if diagnosis[sign_or_symptom + "s"][s]['factors']['pos']:
+                # the mean of the halfnorm needs to be at 3 (3 SD) and the tail needs to be negative
+                # we are going to take a halfnorm dist.  For positive, we'll center (start) at 3SD (3) and
+                #   _subtract_ the dist from the mean (3) giving us a reverse distribution
+                #  We add 2 * 3SD where SD = 1 to move the start of the half-norm to +3SD going backwards
+                intermediate_val = 6*SD - scipy.stats.halfnorm(loc=3*SD).rvs() # (to recenter at the top of the CDF)
+                val = scipy.stats.norm().cdf(intermediate_val)
+                diagnosis[sign_or_symptom + "s"][s] = val
+            else:
+                # for a negative distribution, we'll center (start/mean) the halfnorm -3SD (-3). No need
+                #  to subract since it's going forward
+                intermediate_val = scipy.stats.halfnorm(loc=-3*SD).rvs() # (to recenter at the top of the CDF)
+                val = scipy.stats.norm().cdf(intermediate_val)
+                diagnosis[sign_or_symptom + "s"][s] = val
+        # If it's boolean, pick whether the value will be correct or incorrect and assign it
+        elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'bool':
+            # pick the correct value
+            if baseline.rvs() < cutoff:
+                if factors['inverse']:
+                    diagnosis[sign_or_symptom + "s"][s] = 0
+                else:
+                    diagnosis[sign_or_symptom + "s"][s] = 1
+            # pick the incorrect value
+            else:
+                if factors['inverse']:
+                    diagnosis[sign_or_symptom + "s"][s] = 1
+                else:
+                    diagnosis[sign_or_symptom + "s"][s] = 0
+        # for 3 levels, the bottom level is negative, the middle is 0 and the top is positive
+        #  Because of this we assign based on SD
+        elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'step_3':
+            # Pick a random value.
+            intermediate_val = baseline.rvs()
+            #  If the value is within 1SD, assign it the first level,
+            if intermediate_val >= cutoff / float(3*SD): # since cutoff is 3SD, divide it by 3
+                val = factors['levels'][0]
+            #  If it's > 3SD, assign it the 3rd level
+            elif intermediate_val > cutoff:
+                val = factors['levels'][2]
+            #  If it's between 1 and 3SD, assign it the 2nd level
+            else:
+                val = factors['levels'][1]
+            diagnosis[sign_or_symptom + "s"][s] = val
+        elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'step_10':
+            # choose a value.
+            intermediate_val = baseline.rvs()
+            #Divide the space between the mean and 3SD evenly between 9 levels
+            rng = (cutoff - mean) / float(9) # 9 is the number of samples less than 3SD
+            lvl = int(intermediate_val/rng)
+            # assign based on the bucket of the range
+            # if it's over 3SD, assign the 10th level
+            val = factors['levels'][lvl]
+            diagnosis[sign_or_symptom + "s"][s] = val
+        else:
+            raise KeyError("Function not found in functions list.")
+
     def create_truth_data(self, default_diagnosis=True):
         """
         
@@ -332,8 +417,8 @@ class test_data():
 
 
 
-# noinspection PyUnreachableCode
-def create_diagnosis_data(self, truth_data, records, default_diagnosis, pct_true_sign=.99, pct_true_symptom=.95):
+    # noinspection PyUnreachableCode
+    def create_diagnosis_data(self, truth_data, records, default_diagnosis, pct_true_sign=.99, pct_true_symptom=.95):
         """
 
         :param truth data: a dictionary of {diagnosis: [list of signs and symptoms]} representing ground truth
@@ -342,10 +427,20 @@ def create_diagnosis_data(self, truth_data, records, default_diagnosis, pct_true
         :param pct_true_symptom: float representing the percentage of symptoms which will be from those associated with the diagnosis
         :return: a dictionary of {diagnosis: [list of signs and symptoms]} picked probabilistically to create the requested distribution
 
-        NOTE: The returned dictionary will pick signs and symptoms so that false signs/symptoms are outliers, but will add false positives
-        NOTE: pct_true_sign/pct_true_symptom choose both the number of true/false signs/symptoms, but also, the likelihood that boolean signs/symptoms will be true/false
-        NOTE:   Non-boolean signs/symptoms will be chosen over a half-normal or normal distribution with the mean set at the correct value & 3SD set at the bottom of the range of potential values, (or not set at all for the actual normally distributed signs/symptoms)
-        NOTE: The returned dictionary will use preferential attachment for both true and false positive signs and symptoms.
+        NOTE: The returned dictionary will pick signs and symptoms so that false signs/symptoms are outliers, but will
+                add false positives
+        NOTE: pct_true_sign/pct_true_symptom choose both the number of true/false signs/symptoms, but also, the
+                likelihood that boolean signs/symptoms will be true/false
+        NOTE: Non-boolean signs/symptoms will be chosen over a half-normal or normal distribution with the mean set at
+               the correct value & 3SD set at the bottom of the range of potential values, (or not set at all for the
+               actual normally distributed signs/symptoms)
+        NOTE: The returned dictionary will use preferential attachment for both true and false positive signs and
+            symptoms.
+        NOTE: Because generation of false signs/symptoms from the default diagnosis does not check if the sign/symptom
+               is an actual sign/symptom of the diagnosis, it's possible for signs/symptoms from the false branch to
+               overwrite those from the true branch and visa versa.  In practice this shouldn't be an issue as it is
+               low likelihood and should do nothing more than slightly effect the distributions of true/false
+               signs/symptoms and their values
         """
         # Generate the baseline function used to decide whether to add a true or a false sign/symptom to the record
         mean = 0
@@ -361,7 +456,6 @@ def create_diagnosis_data(self, truth_data, records, default_diagnosis, pct_true
 
         for record in range(records):
             record = default_diagnosis()
-            record['diagnosis']
 
             # Choose a diagnosis from the truth data
             record['diagnosis'] = np.random.choice(truth_data.keys())
@@ -371,86 +465,44 @@ def create_diagnosis_data(self, truth_data, records, default_diagnosis, pct_true
 
             # choose a number of signs based marcus's numbers
             num_signs = round(scipy.stats.norm.rvs(loc=SIGNS_PER_CHART_MEAN, scale=SIGNS_PER_CHART_SD))
-        
-            for sign in num_signs:
+
+            for i in range(num_signs):
                 # If a random number is below the cutoff, choose a correct sign
                 #  Second qualification is to ensure we don't duplicate true signs
                 if baseline.rvs() < cutoff_sign and len(record['signs']) < len(truth_data[record['diagnosis']]['signs']):
-                    sign = np.random.choice(truth_data[record['diagnosis']]['signs'].keys())
-                    factors = truth_data[record['diagnosis']]['signs'][sign]['factors']
-                    # if the sign is normal
-                    if truth_data[record['diagnosis']]['signs'][sign]['function'] == 'normal':
-                        val = scipy.stats.halfnorm(loc=factors['mean'], scale=factors['sd'])
-                        record['diagnosis']['signs'][sign] = val
-                    elif truth_data[record['diagnosis']]['signs'][sign]['function'] == 'log':
-                        # LOG is really the cumulative density function of the norm.
-
-                        if truth_data[record['diagnosis']]['signs'][sign]['pos']:
-                            # the mean of the halfnorm needs to be at 3 (3 SD) and the tail needs to be negative
-                            # we are going to take a halfnorm dist.  For positive, we'll center (start) at 3SD (3) and
-                            #   _subtract_ the dist from the mean (3) giving us a reverse distribution
-                            #  We add 2 * 3SD where SD = 1 to move the start of the half-norm to +3SD going backwards
-                            intermediate_val = 6*SD - scipy.stats.halfnorm(loc=3*SD).rvs() # (to recenter at the top of the CDF)
-                            val = scipy.stats.norm().cdf(intermediate_val)
-                            record['diagnosis']['signs'][sign] = val
-                        else:
-                            # for a negative distribution, we'll center (start/mean) the halfnorm -3SD (-3). No need
-                            #  to subract since it's going forward
-                            intermediate_val = scipy.stats.halfnorm(loc=-3*SD).rvs() # (to recenter at the top of the CDF)
-                            val = scipy.stats.norm().cdf(intermediate_val)
-                            record['diagnosis']['signs'][sign] = val
-                    # If it's boolean, pick whether the value will be correct or incorrect and assign it
-                    elif truth_data[record['diagnosis']]['signs'][sign]['function'] == 'bool':
-                        # pick the correct value
-                        if baseline.rvs() < cutoff_sign:
-                            if truth_data[record['diagnosis']]['signs'][sign]['inverse']:
-                                record['diagnosis']['signs'][sign] = 0
-                            else:
-                                record['diagnosis']['signs'][sign] = 1
-                        # pick the incorrect value
-                        else:
-                            if truth_data[record['diagnosis']]['signs'][sign]['inverse']:
-                                record['diagnosis']['signs'][sign] = 1
-                            else:
-                                record['diagnosis']['signs'][sign] = 0
-                    # for 3 levels, the bottom level is negative, the middle is 0 and the top is positive
-                    #  Because of this we assign based on SD
-                    elif truth_data[record['diagnosis']]['signs'][sign]['function'] == 'step_3':
-                        # Pick a random value.
-                        intermediate_val = baseline.rvs()
-                        #  If the value is within 1SD, assign it the first level,
-                        if intermediate_val >= cutoff_sign / float(3*SD): # since cutoff is 3SD, divide it by 3
-                            val = truth_data[record['diagnosis']]['signs'][sign]['levels'][0]
-                        #  If it's > 3SD, assign it the 3rd level
-                        elif intermediate_val > cutoff_sign:
-                            val = truth_data[record['diagnosis']]['signs'][sign]['levels'][2]
-                        #  If it's between 1 and 3SD, assign it the 2nd level
-                        else:
-                            val = truth_data[record['diagnosis']]['signs'][sign]['levels'][1]
-                        record['diagnosis']['signs'][sign] = val
-                    elif truth_data[record['diagnosis']]['signs'][sign]['function'] == 'step_10':
-                        # choose a value.
-                        intermediate_val = baseline.rvs()
-                        #Divide the space between the mean and 3SD evenly between 9 levels
-                        rng = (cutoff_sign - mean) / float(9) # 9 is the number of samples less than 3SD
-                        lvl = int(intermediate_val/rng)
-                        # assign based on the bucket of the range
-                        # if it's over 3SD, assign the 10th level
-                        val = truth_data[record['diagnosis']]['signs'][sign]['levels'][lvl]
-                        record['diagnosis']['signs'][sign] = val
-                    else:
-                        raise KeyError("Function not found in functions list.")
-
+                    sign, val = self.get_sign_or_symptom_value(truth_data[record['diagnosis']],
+                                                               'sign',
+                                                               cutoff_sign,
+                                                               baseline,
+                                                               mean,
+                                                               SD)
                 else:
-                    pass # TODO: Pick something from the false signs
+                    sign, val = self.get_sign_or_symptom_value(default_diagnosis,
+                                                               'sign',
+                                                               cutoff_sign,
+                                                               baseline,
+                                                               mean,
+                                                               SD)
+                record['signs'][sign] = val
 
-                records.append(record)
+            for i in range(num_symptoms):
+                if baseline.rvs() < cutoff_sign and len(record['signs']) < len(truth_data[record['diagnosis']]['symptoms']):
+                    symptom, val = self.get_sign_or_symptom_value(truth_data[record['diagnosis']],
+                                                                  'symptom',
+                                                                  cutoff_symptom,
+                                                                  baseline,
+                                                                  mean,
+                                                                  SD)
+                else:
+                    symptom, val = self.get_sign_or_symptom_value(default_diagnosis,
+                                                                  'symptom',
+                                                                  cutoff_symptom,
+                                                                  baseline,
+                                                                  mean,
+                                                                  SD)
+                record['symptoms'][symptom] = val
 
-            for symptom in num_symptoms:
-                pass # repeat everything above for symptoms
-
-
-
+            synthetic_records.append(record)
 
         return synthetic_records
 
