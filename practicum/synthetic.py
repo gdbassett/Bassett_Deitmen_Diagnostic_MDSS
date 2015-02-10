@@ -104,18 +104,20 @@ parser.add_argument('db', help='URL of the neo4j graph database', default=NEODB)
 #    logging.basicConfig(level=args.loglevel)
 # <add other setup here>
 # Connect to database
-G = neo4j.GraphDatabaseService(NEODB)
-g = nx.DiGraph()
-NEODB = args.db
+#G = neo4j.GraphDatabaseService(NEODB)
+#g = nx.DiGraph()
+#NEODB = args.db
 
 
 ## EXECUTION
 class test_data():
     truth = None
     dists = None
+    default = None
+    records = None
 
     def __init__(self):
-        self.truth = self.create_truth_data()
+        self.truth, self.default = self.create_truth_data()
         self.dists = {
             "bool": self.dist_bool,
             "step_3": self.dist_3_step,
@@ -124,6 +126,13 @@ class test_data():
             "normal": self.dist_normal
         }
 
+
+    def generate_records(self, record_count=1000000, pct_tru_sign=.99, pct_true_symptom=.95):
+        self.records = self.create_diagnosis_data(self, self.truth,
+                                                  record_count,
+                                                  self.default,
+                                                  pct_tru_sign,
+                                                  pct_true_symptom)
 
     def dist_step(self, x, levels):
         return levels[x-1]
@@ -247,11 +256,17 @@ class test_data():
             s = np.random.choice(diagnosis['symptoms'].keys())
         else:
             raise ValueError("sign_or_symptom must be 'sign' or 'symptom'")
-        factors = diagnosis[sign_or_symptom + "s"][s]['factors']
+        try:
+            factors = diagnosis[sign_or_symptom + "s"][s]['factors']
+        except:
+            print diagnosis
+            print sign_or_symptom + "s"
+            print s
+
         # if the sign is normal
         if diagnosis[sign_or_symptom + "s"][s]['function'] == 'normal':
             val = scipy.stats.halfnorm(loc=factors['mean'], scale=factors['sd'])
-            diagnosis[sign_or_symptom + "s"][s] = val
+#            diagnosis[sign_or_symptom + "s"][s] = val
         elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'log':
             # LOG is really the cumulative density function of the norm.
 
@@ -262,27 +277,28 @@ class test_data():
                 #  We add 2 * 3SD where SD = 1 to move the start of the half-norm to +3SD going backwards
                 intermediate_val = 6*SD - scipy.stats.halfnorm(loc=3*SD).rvs() # (to recenter at the top of the CDF)
                 val = scipy.stats.norm().cdf(intermediate_val)
-                diagnosis[sign_or_symptom + "s"][s] = val
+#                diagnosis[sign_or_symptom + "s"][s] = val
             else:
                 # for a negative distribution, we'll center (start/mean) the halfnorm -3SD (-3). No need
                 #  to subract since it's going forward
                 intermediate_val = scipy.stats.halfnorm(loc=-3*SD).rvs() # (to recenter at the top of the CDF)
                 val = scipy.stats.norm().cdf(intermediate_val)
-                diagnosis[sign_or_symptom + "s"][s] = val
+#                diagnosis[sign_or_symptom + "s"][s] = val
         # If it's boolean, pick whether the value will be correct or incorrect and assign it
         elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'bool':
             # pick the correct value
             if baseline.rvs() < cutoff:
                 if factors['inverse']:
-                    diagnosis[sign_or_symptom + "s"][s] = 0
+                    val = 0
                 else:
-                    diagnosis[sign_or_symptom + "s"][s] = 1
+                    val = 1
             # pick the incorrect value
             else:
                 if factors['inverse']:
-                    diagnosis[sign_or_symptom + "s"][s] = 1
+                    val = 1
                 else:
-                    diagnosis[sign_or_symptom + "s"][s] = 0
+                    val = 0
+#            diagnosis[sign_or_symptom + "s"][s] = val
         # for 3 levels, the bottom level is negative, the middle is 0 and the top is positive
         #  Because of this we assign based on SD
         elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'step_3':
@@ -297,7 +313,7 @@ class test_data():
             #  If it's between 1 and 3SD, assign it the 2nd level
             else:
                 val = factors['levels'][1]
-            diagnosis[sign_or_symptom + "s"][s] = val
+#            diagnosis[sign_or_symptom + "s"][s] = val
         elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'step_10':
             # choose a value.
             intermediate_val = baseline.rvs()
@@ -306,10 +322,19 @@ class test_data():
             lvl = int(intermediate_val/rng)
             # assign based on the bucket of the range
             # if it's over 3SD, assign the 10th level
-            val = factors['levels'][lvl]
-            diagnosis[sign_or_symptom + "s"][s] = val
+            if lvl > 9:
+                lvl = 9
+            try:
+                val = factors['levels'][lvl]
+            except:
+                print rng, factors['levels'], lvl
+                raise
+#            diagnosis[sign_or_symptom + "s"][s] = val
         else:
-            raise KeyError("Function not found in functions list.")
+            raise KeyError("Function {0} not found in functions list.".format(diagnosis[sign_or_symptom + "s"][s]['function']))
+
+        return s, val
+#        return s, diagnosis[sign_or_symptom + "s"][s]
 
     def create_truth_data(self, default_diagnosis=True):
         """
@@ -357,24 +382,24 @@ class test_data():
                 for sign in range(int(signs_per_diag_set.pop())):
                     # Choose a sign from the constantly updated preferential list
                     s = signs_preferential[int(np.random.sample() * len(signs_preferential))]
-                    truth[diagnosis]['signs'][s] = {'function': distributions[s], 'factors':{}}
+                    truth[diagnosis]['signs'][s] = {'function': distributions[s], 'factors':{}, 'function_type':{}}
                     # Add the sign to the preferential list so that the it is more likely to be chosen next time.
                     signs_preferential.append(s)
             else:
                 for sign in range(int(signs_per_diag_set.pop())):
                     s = signs[int(np.random.sample() * len(signs))]
-                    truth[diagnosis]['signs'][s] = {'function': distributions[s], 'factors':{}}
+                    truth[diagnosis]['signs'][s] = {'function': distributions[s], 'factors':{}, 'function_type':{}}
 
             if PREFERENTIALLY_ATTACH_SYMPTOMS:
                 for symptom in range(int(symptoms_per_diag_set.pop())):
                     s = symptoms_preferential[int(np.random.sample() * len(symptoms_preferential))]
-                    truth[diagnosis]['symptoms'][s] = {'function': distributions[s], 'factors':{}}
+                    truth[diagnosis]['symptoms'][s] = {'function': distributions[s], 'factors':{}, 'function_type':{}}
                     symptoms_preferential.append(s)
             else:
                 for symptom in range(int(symptoms_per_diag_set.pop())):
                     # randomly choose a symptom and append it to the symptoms list
                     s = symptoms[int(np.random.sample() * len(symptoms))]
-                    truth[diagnosis]['symptoms'][s] = {'function': distributions[s], 'factors':{}}
+                    truth[diagnosis]['symptoms'][s] = {'function': distributions[s], 'factors':{}, 'function_type':{}}
 
         # clean up of variables which shouldn't be trusted
         del(signs_per_diag_set)
@@ -385,13 +410,13 @@ class test_data():
         # Assign Distribution Characteristics to Diagnosis-Symptom
         ## Distribution characteristics are limited to positive or negative relationships to features
         for diagnosis in truth.keys():
-            for sign in truth[diagnosis]:
+            for sign in truth[diagnosis]['signs']:
                 function =  truth[diagnosis]['signs'][sign]['function']
                 factors, f_type = self.get_factors_and_type(function)
                 truth[diagnosis]['signs'][sign]['factors'] = factors
                 truth[diagnosis]['signs'][sign]['function_type'] = f_type
 
-            for symptom in truth[diagnosis]:
+            for symptom in truth[diagnosis]['symptoms']:
                 function =  truth[diagnosis]['symptoms'][symptom]['function']
                 factors, f_type = self.get_factors_and_type(function)
                 truth[diagnosis]['symptoms'][symptom]['factors'] = factors
@@ -401,13 +426,21 @@ class test_data():
         if default_diagnosis:
             default = self.diagnosis_struct()
             for sign in signs:
-                factors, f_type = self.get_factors_and_type(distributions[sign])
-                default['signs'][sign]['factors'] = factors
-                default['signs'][sign]['function_type'] = f_type
+                function =  distributions[sign]
+                factors, f_type = self.get_factors_and_type(function)
+                default['signs'][sign] = {
+                    'factors': factors,
+                    'function_type': f_type,
+                    'function': function
+                }
             for symptom in symptoms:
-                factors, f_type = self.get_factors_and_type(distributions[symptom])
-                default['symptoms'][symptom]['factors'] = factors
-                default['symptoms'][symptom]['function_type'] = f_type
+                function =  distributions[symptom]
+                factors, f_type = self.get_factors_and_type(function)
+                default['symptoms'][symptom] = {
+                    'factors': factors,
+                    'function_type': f_type,
+                    'function': function
+                }
 
         # Return
         if default_diagnosis:
@@ -454,28 +487,38 @@ class test_data():
         cutoff_sign = baseline.ppf(pct_true_sign)
         cutoff_symptom = baseline.ppf(pct_true_symptom)
 
-        for record in range(records):
-            record = default_diagnosis()
+        for i in range(records):
+            record = self.diagnosis_struct()
 
             # Choose a diagnosis from the truth data
             record['diagnosis'] = np.random.choice(truth_data.keys())
 
             # choose a number of symptoms based on marcus's numbers
-            num_symptoms = round(scipy.stats.norm.rvs(loc=SYMPTOMS_PER_CHART_MEAN, scale=SYMPTOMS_PER_CHART_SD))
+            num_symptoms = int(round(scipy.stats.norm.rvs(loc=SYMPTOMS_PER_CHART_MEAN, scale=SYMPTOMS_PER_CHART_SD)))
 
             # choose a number of signs based marcus's numbers
-            num_signs = round(scipy.stats.norm.rvs(loc=SIGNS_PER_CHART_MEAN, scale=SIGNS_PER_CHART_SD))
+            num_signs = int(round(scipy.stats.norm.rvs(loc=SIGNS_PER_CHART_MEAN, scale=SIGNS_PER_CHART_SD)))
 
             for i in range(num_signs):
                 # If a random number is below the cutoff, choose a correct sign
                 #  Second qualification is to ensure we don't duplicate true signs
                 if baseline.rvs() < cutoff_sign and len(record['signs']) < len(truth_data[record['diagnosis']]['signs']):
-                    sign, val = self.get_sign_or_symptom_value(truth_data[record['diagnosis']],
+                    try:
+                        sign, val = self.get_sign_or_symptom_value(truth_data[record['diagnosis']],
                                                                'sign',
                                                                cutoff_sign,
                                                                baseline,
                                                                mean,
                                                                SD)
+                    except:
+                        print truth_data[record['diagnosis']]
+                        print 'sign'
+                        print cutoff_sign
+                        print type(baseline)
+                        print mean
+                        print SD
+                        print num_signs
+                        raise
                 else:
                     sign, val = self.get_sign_or_symptom_value(default_diagnosis,
                                                                'sign',
