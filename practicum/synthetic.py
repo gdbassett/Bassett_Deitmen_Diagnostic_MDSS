@@ -47,6 +47,7 @@ NEODB = "http://192.168.121.134:7474/db/data"
 np.random.seed(5052015)
 
 ## TRUTH DATA STATIC VARIABLES
+## Based on consultation with domain specialist, (ER MD, Acting medical director of hospital, 30 years experience, etc.
 DIAGNOSES = 10000
 SIGNS = 3000
 SYMPTOMS = 150
@@ -62,6 +63,8 @@ SYMPTOMS_PER_CHART_MEAN = 5
 SYMPTOMS_PER_CHART_SD = .6
 SIGNS_PER_CHART_MEAN = 2.5
 SIGNS_PER_CHART_SD = .3
+PCT_FALSE_SIGNS = .08
+PCT_FALSE_SYMPTOMS = .2
 
 
 ## RECORDS STATIC VARIABLES
@@ -127,7 +130,7 @@ class test_data():
         }
 
 
-    def generate_records(self, record_count=1000000, pct_tru_sign=.99, pct_true_symptom=.95):
+    def generate_records(self, record_count=1000000, pct_tru_sign=.92, pct_true_symptom=.80):
         self.records = self.create_diagnosis_data(self, self.truth,
                                                   record_count,
                                                   self.default,
@@ -265,7 +268,7 @@ class test_data():
 
         # if the sign is normal
         if diagnosis[sign_or_symptom + "s"][s]['function'] == 'normal':
-            val = scipy.stats.halfnorm(loc=factors['mean'], scale=factors['sd'])
+            val = scipy.stats.norm(loc=factors['mean'], scale=factors['sd'])  # TODO: This should be the normal distribution. do we need to scale to the cutoff for synthetic records?
 #            diagnosis[sign_or_symptom + "s"][s] = val
         elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'log':
             # LOG is really the cumulative density function of the norm.
@@ -451,7 +454,7 @@ class test_data():
 
 
     # noinspection PyUnreachableCode
-    def create_diagnosis_data(self, truth_data, records, default_diagnosis, pct_true_sign=.99, pct_true_symptom=.95):
+    def create_diagnosis_data(self, truth_data, records, default_diagnosis, pct_true_sign=.92, pct_true_symptom=.80):
         """
 
         :param truth data: a dictionary of {diagnosis: [list of signs and symptoms]} representing ground truth
@@ -499,9 +502,10 @@ class test_data():
             # choose a number of signs based marcus's numbers
             num_signs = int(round(scipy.stats.norm.rvs(loc=SIGNS_PER_CHART_MEAN, scale=SIGNS_PER_CHART_SD)))
 
-            for i in range(num_signs):
+            for j in range(num_signs):
                 # If a random number is below the cutoff, choose a correct sign
                 #  Second qualification is to ensure we don't duplicate true signs
+                # TODO: Logic below is incorrect as len(record['signs']) could count false signs in addition to true ones
                 if baseline.rvs() < cutoff_sign and len(record['signs']) < len(truth_data[record['diagnosis']]['signs']):
                     try:
                         sign, val = self.get_sign_or_symptom_value(truth_data[record['diagnosis']],
@@ -528,8 +532,9 @@ class test_data():
                                                                SD)
                 record['signs'][sign] = val
 
-            for i in range(num_symptoms):
-                if baseline.rvs() < cutoff_sign and len(record['signs']) < len(truth_data[record['diagnosis']]['symptoms']):
+            for j in range(num_symptoms):
+                # TODO: Logic below is incorrect as len(record['symptoms']) could count false symptoms in addition to true ones
+                if baseline.rvs() < cutoff_symptom and len(record['symptoms']) < len(truth_data[record['diagnosis']]['symptoms']):
                     symptom, val = self.get_sign_or_symptom_value(truth_data[record['diagnosis']],
                                                                   'symptom',
                                                                   cutoff_symptom,
