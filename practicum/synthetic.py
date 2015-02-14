@@ -489,7 +489,7 @@ class test_data():
 
         # if the sign is normal
         if diagnosis[sign_or_symptom + "s"][s]['function'] == 'normal':
-            val = scipy.stats.norm(loc=factors['mean'], scale=factors['sd'])  # TODO: This should be the normal distribution. do we need to scale to the cutoff for synthetic records?
+            val = scipy.stats.norm(loc=factors['mean'], scale=factors['sd']).rvs()  # TODO: This should be the normal distribution. do we need to scale to the cutoff for synthetic records?
 #            diagnosis[sign_or_symptom + "s"][s] = val
         elif diagnosis[sign_or_symptom + "s"][s]['function'] == 'log':
             # LOG is really the cumulative density function of the norm.

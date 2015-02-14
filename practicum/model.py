@@ -107,13 +107,14 @@ parser.add_argument('db', help='URL of the neo4j graph database', default=NEODB)
 ## EXECUTION
 class decision_support_system():
     model = None
+    record_graph = None
 
 
     def __init__(self):
         pass
 
 
-    def load_nx_model(self, records):
+    def train_nx_model(self, records):
         # Graph 1 for all relationships
         g1 = nx.MultiDiGraph()
         # Graph 2 for condensed relationships and functional probabilities
@@ -131,6 +132,9 @@ class decision_support_system():
             for sign in record['signs']:
                 g1.add_edge(sign, record['diagnosis'], value=record['signs'][sign])
                 signs[sign] += 1
+                if type(record['signs'][sign]) not in [int, float, np.float64]:
+                    raise TypeError('Sign/Symptom {0} must be some type of number rather than {1} for {2}'.format(
+                        sign, type(record['signs'][sign]), record))
             for symptom in record['symptoms']:
                 g1.add_edge(symptom, record['diagnosis'], value=record['symptoms'][symptom])
                 symptoms[symptom] +=1
@@ -138,16 +142,25 @@ class decision_support_system():
 
         # g1 now has a bipartite multi directed graph with edges from signs or symptoms to diagnosis
         #  bearing the value in a single record
-
+        self.record_graph = g1
 
         # With G2, we take each sign/symptom relationship and compress multi-edges down to a single edge with a
         #  probability density distribution function for the edge.  This will be what we use for classifying in the
         #  model.
 
         relationships = set(g1.edges())
+
+        # this is a bit of a hack with a 4 relationship filter set arbitrarily
+        remove_rels = set()
+        for relationship in relationships:
+            if len(g1.edge[relationship[0]][relationship[1]]) <= 4:  # 4 is arbitrary @ 1 million records, tru are usually > 20 or 30 & false are normally < 5
+                remove_rels.add(relationship)
+        relationships = relationships.difference(remove_rels)
+
+
         # for each edge pair
         for relationship in relationships:
-            edges = g1.edge[relationship[0]][relationship[1]]
+            edges = copy.deepcopy(g1.edge[relationship[0]][relationship[1]])
             # build a distribution (histogram) of the values
             values = Counter([edges[x]['value'] for x in edges])
             x = np.asarray(values.keys())
@@ -157,42 +170,28 @@ class decision_support_system():
             # Tried using curve_fit (immediately below), but requires binned data so chose norm.fit()
             #params, pcov = curve_fit(lambda x_data, a, b: scipy.stats.halfnorm.pdf(x_data, loc=a, scale=b), x_in, [n/float(sum(y_in)) for n in y_in])
             # create distribution
-            # TODO: May not want to use norm.fit() for half-norm data due to cdf not reaching 1.  Instead peg median @ max val @ use curve_fit to plot cdf
-            mu, std = scipy.stats.norm.fit([edges[x]['value'] for x in edges])
+            mu, std = scipy.stats.norm.fit([edges[n]['value'] for n in edges])
+
 
             # create the normal fit
             # if there is data beyond mu +- std, keep it
-            if len([n for n in x < mu - std]) > 0 and len([n for n in x > mu + std]) > 0:
+            if len([n for n in x if n < mu - std]) > 0 and len([n for n in x if n > mu + std]) > 0:
                 normalize = scipy.stats.norm(loc=mu, scale=std).pdf(mu)  # normalize to the mean
                 f = lambda x_data : scipy.stats.norm(loc=mu, scale=std).pdf(x_data) / float(normalize)
             # else, scrap it and create a halfnorm (or just use the cdf
             else:
+                # Can't get a good plot out of halfnorm so using full norm & normalizing the to the max in the data
                 normalize = scipy.stats.norm(loc=mu, scale=std).cdf(max(x))  # normalze to the maximum of the data
                 f = lambda x_data: scipy.stats.norm(loc=mu, scale=std).cdf(x_data) / float(normalize)
 
+
             # store density function on edge
-            g2.add_edge(relationship[0], relationship[1], value = f)
+            g2.add_edge(relationship[0], relationship[1], value = f, relationship_count = len(edges))
+
+            #f when called with a value for the sign/symptom will return a confidence score that should be normalized to 1
 
         # boom.  model.
-        self.model = g2
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        return g2
 
 
 
