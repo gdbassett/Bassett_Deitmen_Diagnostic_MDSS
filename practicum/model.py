@@ -55,6 +55,7 @@ PERCENT_CONTINUOUS_SIGNS = 0.05
 PERCENT_CONTINUOUS_SYMPTOMS = 0.05
 PREFERENTIALLY_ATTACH_SIGNS = True
 PREFERENTIALLY_ATTACH_SYMPTOMS = False
+SIGN_VS_SYMPTOM_RELATIVE_WEIGHT = 1.25 # i.e. we trust signs 125% and symptoms 100%. or signs 100% and symptoms 80%
 
 
 ## RECORDS STATIC VARIABLES
@@ -194,7 +195,50 @@ class decision_support_system():
         return g2
 
 
+    def query_model(self, record):
 
+        # get potential diagnoses
+        potential_diagnoses = set()
+        for sign in record['signs']:
+            potential_diagnoses.union(self.model.successors(sign))
+        for symptom in record['symptoms']:
+            potential_diagnoses.union(self.model.successors(symptom))
+
+        # filter the diagnoses by primary symptom
+        pass  # TODO
+
+        # score the diagnoses
+        scores = defaultdict(float)
+        for diagnosis in potential_diagnoses:
+            sign_edge_cnt = 0
+            symptom_edge_cnt = 0
+            for predecessor in self.model.predecessors(diagnosis):
+                if 'sign' in predecessor:
+                    sign_edge_cnt += self.model.edge[predecessor][diagnosis]['relationship_count']
+                elif 'symptom' in predecessor:
+                    symptom_edge_cnt += self.model.edge[predecessor][diagnosis]['relationship_count']
+            for sign in record['signs']:
+                if self.model.has_edge(sign, diagnosis):
+                    # edge values form signs/symptoms
+                    score = self.model.edge[sign, diagnosis]['value'](record['signs'][sign])  # call the relationship model
+                    # weighted by #edges/ sum(#edges of diagnosis)
+                    score = score * self.model.edge[sign, diagnosis]['relationship_count'] / float(sign_edge_cnt)
+                    # weighted for relative importance of particular sign (i.e. chest pain > finger pain)
+                    score = score * self.model.node[sign].get('relative_weight', 1)
+                    # weighted less for symptoms
+                    score = SIGN_VS_SYMPTOM_RELATIVE_WEIGHT * score
+            for symptom in record['symptoms']:
+                if self.model.has_edge(symptom, diagnosis):
+                    # edge values form signs/symptoms
+                    score = self.model.edge[symptom, diagnosis]['value'](record['signs'][symptom])  # call the relationship model
+                    # weighted less for symptoms
+                    score = score * self.model.edge[symptom, diagnosis]['relationship_count'] / float(symptom_edge_cnt)
+                    # weighted for relative importance of particular sign (i.e. chest pain > finger pain)
+                    score = score * self.model.node[sign].get('relative_weight', 1)
+                    # weighted by #edges/ sum(#edges of diagnosis)
+                    score = 1 * score  # SIGN_VS_SYMPTOM_RELATIVE_WEIGHT value is normalized to this one
+
+        return scores
 
 '''
     model = None  # in the form of a graph
