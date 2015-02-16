@@ -43,7 +43,7 @@ NEODB = "http://192.168.121.134:7474/db/data"
 # SET RANDOM SEED 
 np.random.seed(5052015)
 
-## TRUTH DATA STATIC VARIABLES
+## TRUTH DATA STATIC VARIABLES, based on physician recommendation
 DIAGNOSES = 10000
 SIGNS = 3000
 SYMPTOMS = 150
@@ -55,8 +55,8 @@ PERCENT_CONTINUOUS_SIGNS = 0.05
 PERCENT_CONTINUOUS_SYMPTOMS = 0.05
 PREFERENTIALLY_ATTACH_SIGNS = True
 PREFERENTIALLY_ATTACH_SYMPTOMS = False
-SIGN_VS_SYMPTOM_RELATIVE_WEIGHT = 1.25 # i.e. we trust signs 125% and symptoms 100%. or signs 100% and symptoms 80%
-
+#SYMPTOM_VS_SIGN_RELATIVE_WEIGHT = .7 # symptom_weight/sign_weight i.e. we trust signs 100% and symptoms 70%
+SYMPTOM_VS_SIGN_RELATIVE_WEIGHT = .6/.85 # symptom_weight/sign_weight i.e. we trust signs 100% and symptoms 70%
 
 ## RECORDS STATIC VARIABLES
 
@@ -108,47 +108,34 @@ parser.add_argument('db', help='URL of the neo4j graph database', default=NEODB)
 ## EXECUTION
 class decision_support_system():
     model = None
-    record_graph = None
+    records_graph = None
+    signs = None
+    symptoms = None
+    diagnoses = None
 
 
     def __init__(self):
         pass
 
 
-    def train_nx_model(self, records):
-        # Graph 1 for all relationships
-        g1 = nx.MultiDiGraph()
-        # Graph 2 for condensed relationships and functional probabilities
-        g2 = nx.DiGraph()
-        # Define dictionaries to store the signs, symptoms, and diagnoses and cardinality
-        signs = defaultdict(int)
-        symptoms = defaultdict(int)
-        diagnoses = defaultdict(int)
+    def build_model_nx(self, g1=None):
+        """
+        :param g1: a networkx MultiDiGraph with nodes for signs/symptoms and diagnoses and edges from signs/symptoms to the diagnoses
+        :return: a networkx DiGraph representing the model
+        """
 
-
-
-        # for each record, connect signs/symtoms to their respective diagnoses with value
-        for record in records:
-            diagnoses['diagnosis'] += 1
-            for sign in record['signs']:
-                g1.add_edge(sign, record['diagnosis'], value=record['signs'][sign])
-                signs[sign] += 1
-                if type(record['signs'][sign]) not in [int, float, np.float64]:
-                    raise TypeError('Sign/Symptom {0} must be some type of number rather than {1} for {2}'.format(
-                        sign, type(record['signs'][sign]), record))
-            for symptom in record['symptoms']:
-                g1.add_edge(symptom, record['diagnosis'], value=record['symptoms'][symptom])
-                symptoms[symptom] +=1
-
-
-        # g1 now has a bipartite multi directed graph with edges from signs or symptoms to diagnosis
-        #  bearing the value in a single record
-        self.record_graph = g1
-
-        # With G2, we take each sign/symptom relationship and compress multi-edges down to a single edge with a
+            # With G2, we take each sign/symptom relationship and compress multi-edges down to a single edge with a
         #  probability density distribution function for the edge.  This will be what we use for classifying in the
         #  model.
 
+        # Graph 2 for condensed relationships and functional probabilities
+        g2 = nx.DiGraph()
+
+        # in case records_graph was not filled in, use the one from the object
+        if g1 is None:
+            g1 = self.records_graph
+
+        # Store the graph to an internal variable.  This could be used for
         relationships = set(g1.edges())
 
         # this is a bit of a hack with a 4 relationship filter set arbitrarily
@@ -191,18 +178,70 @@ class decision_support_system():
 
             #f when called with a value for the sign/symptom will return a confidence score that should be normalized to 1
 
+        # add a type to each node to make coloring/filtering them easier
+        for node in g2.nodes():
+            g2.node[node]['type'] = node.split("_",1)[0]
+
+        # for each node, count the number of relationships it had from g1
+        for node in g2.nodes():
+            type = g2.node[node]['type']
+            if type in ['sign', 'symptom']:
+                g2.node[node]['relationship_count'] = g1.out_degree(node)
+            elif type in ['diagnosis']:
+                g2.node[node]['relationship_count'] = g2.in_degree(node)
+
+
         # boom.  model.
         return g2
 
+    def injest_records_nx(self, records):
+        """
+        :param records: Takes a list of medical records (synthetic or otherwise) in the form {diagnosis:"", signs:{}, symptoms:{}}
+        :return: a networkx graph representing the records
+        """
+        # Graph 1 for all relationships
+        g1 = nx.MultiDiGraph()
+        # Define dictionaries to store the signs, symptoms, and diagnoses and cardinality
+        signs = defaultdict(int)
+        symptoms = defaultdict(int)
+        diagnoses = defaultdict(int)
 
-    def query_model(self, record):
+
+
+        # for each record, connect signs/symtoms to their respective diagnoses with value
+        for record in records:
+            diagnoses['diagnosis'] += 1
+            for sign in record['signs']:
+                g1.add_edge(sign, record['diagnosis'], value=record['signs'][sign])
+                signs[sign] += 1
+                if type(record['signs'][sign]) not in [int, float, np.float64]:
+                    raise TypeError('Sign/Symptom {0} must be some type of number rather than {1} for {2}'.format(
+                        sign, type(record['signs'][sign]), record))
+            for symptom in record['symptoms']:
+                g1.add_edge(symptom, record['diagnosis'], value=record['symptoms'][symptom])
+                symptoms[symptom] +=1
+
+        # Actual tallies can be found by querying the degree of self.record_graph
+        self.signs = signs.keys()
+        self.symptoms = symptoms.keys()
+        self.diagnoses = diagnoses.keys()
+        self.records_graph = g1
+
+        # g1 now has a bipartite multi directed graph with edges from signs or symptoms to diagnosis
+        #  bearing the value in a single record
+        return g1
+
+
+    def query_nx_model(self, record):
 
         # get potential diagnoses
         potential_diagnoses = set()
         for sign in record['signs']:
-            potential_diagnoses.union(self.model.successors(sign))
+            if self.model.has_node(sign):
+                potential_diagnoses = potential_diagnoses.union(self.model.successors(sign))
         for symptom in record['symptoms']:
-            potential_diagnoses.union(self.model.successors(symptom))
+            if self.model.has_node(symptom):
+                potential_diagnoses = potential_diagnoses.union(self.model.successors(symptom))
 
         # filter the diagnoses by primary symptom
         pass  # TODO
@@ -212,33 +251,73 @@ class decision_support_system():
         for diagnosis in potential_diagnoses:
             sign_edge_cnt = 0
             symptom_edge_cnt = 0
+            # Below replaced with total count on diagnosis nodes
+            '''
             for predecessor in self.model.predecessors(diagnosis):
                 if 'sign' in predecessor:
                     sign_edge_cnt += self.model.edge[predecessor][diagnosis]['relationship_count']
                 elif 'symptom' in predecessor:
                     symptom_edge_cnt += self.model.edge[predecessor][diagnosis]['relationship_count']
+            '''
+            sign_score = 0
             for sign in record['signs']:
                 if self.model.has_edge(sign, diagnosis):
                     # edge values form signs/symptoms
-                    score = self.model.edge[sign, diagnosis]['value'](record['signs'][sign])  # call the relationship model
+                    sign_score += self.model.edge[sign][diagnosis]['value'](record['signs'][sign])  # call the relationship model
                     # weighted by #edges/ sum(#edges of diagnosis)
+                    # Below replaced with total count on diagnosis nodes
+                    '''
                     score = score * self.model.edge[sign, diagnosis]['relationship_count'] / float(sign_edge_cnt)
+                    '''
+                    sign_score *= self.model.edge[sign][diagnosis]['relationship_count'] / \
+                            float(self.model.node[diagnosis]['relationship_count'])
                     # weighted for relative importance of particular sign (i.e. chest pain > finger pain)
-                    score = score * self.model.node[sign].get('relative_weight', 1)
+                    sign_score *= self.model.node[sign].get('relative_weight', 1)
                     # weighted less for symptoms
-                    score = SIGN_VS_SYMPTOM_RELATIVE_WEIGHT * score
+                    sign_score *= 1  # SYMPTOM_VS_SIGN_RELATIVE_WEIGHT value below is normalized to this one (1)
+            symptom_score = 0
             for symptom in record['symptoms']:
                 if self.model.has_edge(symptom, diagnosis):
                     # edge values form signs/symptoms
-                    score = self.model.edge[symptom, diagnosis]['value'](record['signs'][symptom])  # call the relationship model
+                    symptom_score += self.model.edge[symptom][diagnosis]['value'](record['symptoms'][symptom])  # call the relationship model
                     # weighted less for symptoms
+                    # Below replaced with total count on diagnosis nodes
+                    '''
                     score = score * self.model.edge[symptom, diagnosis]['relationship_count'] / float(symptom_edge_cnt)
+                    '''
+                    try:
+                        symptom_score *= self.model.edge[symptom][diagnosis]['relationship_count'] / \
+                                float(self.model.node[diagnosis]['relationship_count'])
+                    except:
+                        print diagnosis, symptom
+                        raise
                     # weighted for relative importance of particular sign (i.e. chest pain > finger pain)
-                    score = score * self.model.node[sign].get('relative_weight', 1)
+                    symptom_score *= self.model.node[symptom].get('relative_weight', 1)
                     # weighted by #edges/ sum(#edges of diagnosis)
-                    score = 1 * score  # SIGN_VS_SYMPTOM_RELATIVE_WEIGHT value is normalized to this one
+                    symptom_score *= SYMPTOM_VS_SIGN_RELATIVE_WEIGHT
+
+            scores[diagnosis] = sign_score + symptom_score
 
         return scores
+
+
+    def train_nx_model(self, records):
+        """
+        :param records: Takes a list of medical records (synthetic or otherwise) in the form {diagnosis:"", signs:{}, symptoms:{}}
+        :return: a networkx graph representing the model
+        """
+
+        # From the list of records, build the records graph
+        self.records_graph = self.injest_records_nx(records)
+        g1 = self.records_graph
+
+        # From the records graph, build the graph model
+        self.model = self.build_model_nx(g1)
+        return self.model
+
+
+
+
 
 '''
     model = None  # in the form of a graph
@@ -397,19 +476,6 @@ class decision_support_system():
 def main():
     logging.info('Beginning main loop.')
 
-    # Initialize the arguements
-    api_parser = reqparse.RequestParser()
-    #api_parser.add_argument('ASN1', type=str, help="First ASN of query. (Order doesn't matter.)", default=None)
-    #api_parser.add_argument('ASN2', type=str, help="Second ASN of query.  (Order doesn't matter.)", default=None)
-    #api_parser.add_argument('verizon', type=bool, help="Report on verizon existance in ASN's paths.", default=False)
-    #api_parser.add_argument('source', type=str, help="An ASN representing the source of the traffic", default=False)
-    #api_parser.add_argument('destination', type=str, help="An IP address or subnet destination." , default=False)
-
-    app = Flask(__name__)
-    api = Api(app)
-    api.add_resource(ASNSearch, '/')
-    app.run(debug=True)
-    logging.info('Ending main loop.')
-
+    logging.info('Main loop complete.')
 if __name__ == "__main__":
     main()    
