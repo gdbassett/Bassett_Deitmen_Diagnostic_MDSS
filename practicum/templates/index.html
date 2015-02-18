@@ -7,7 +7,7 @@ $(document).ready(function() {
 
     $('#addButton').live('click', function() {
 
-        $('<p><input type="text" id="sign_symptom_name_' + counter + '" size="22" name="sign_symptom_name_' + counter + '" value="" placeholder="Sign or Symptom Name" /> <input type="text" id="sign_symptom_value_' + counter + '" size="20" name="sign_symptom_value_' + counter + '" value="" placeholder="Sign or Symptom Value" /> <a href="#" id="rmSignSymptom">Remove</a></p>').appendTo("#inDiv");
+        $('<p><input class="textbox1" type="text" id="sign_symptom_name_' + counter + '" size="22" name="sign_symptom_name_' + counter + '" value="" placeholder="Sign or Symptom Name" /> <input class="textbox2" type="text" id="sign_symptom_value_' + counter + '" size="20" name="sign_symptom_value_' + counter + '" value="" placeholder="Sign or Symptom Value" /> <a href="#" id="rmSignSymptom">Remove</a></p>').appendTo("#inDiv");
         counter++;
         return false
      });
@@ -32,52 +32,37 @@ $(document).ready(function() {
             contentType: "application/json; charset=utf-8",
             data: o,
             success: function(data) {
-                $('#echoResult').text(data.value); # TODO: FIX THIS
+                var diag = data.result;
+                $('<tr> <td colspan=2>Diagnoses:</td></tr>').appendTo('#diagTable');
+                for (var i = 0; i < diag.length; i++) {
+                    $('<tr><td>' + diag[i][0] + '</td><td>' + diag[i][1] + '</td></tr>').appendTo('#diagTable');
+                };
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                alert(errorThrown);
             }
         });
     });
 
-    $.fn.serializeObject = function()
-    {
-        var o = {};
-        var a = this.serializeArray();
-        $.each(a, function() {
-            if (o[this.name] !== undefined) {
-                if (!o[this.name].push) {
-                    o[this.name] = [o[this.name]];
-                }
-                o[this.name].push(this.value || '');
-            } else {
-                o[this.name] = this.value || '';
-            }
-        });
-        return o;
-    };
-
-   $("#diagnoseButton").click(function() {
-
-   });
-
 });
 </script>
-<head>
-<div style="text-align: center;"><h1>Diagnostic Medical Decision Support System</h1></div>
 
-<input type='button' value='Add Button' id='addButton'>
-<input type="button" value="Diagnose" id="diagnoseButton">
+<body>
+<h1>Diagnostic Medical Decision Support System</h1><br />
+
+<input class='button1' type='button' value='Add Sign or Symptom' id='addButton'>
+<input class='button2' type="button" value="Diagnose" id="diagnoseButton">
 
 <form id="chart">
 <div id="inDiv">
-    <p><input type="text" name="sign_symptom_name_1" size="22" id="sign_symptom_name_1" value="" placeholder="Sign or Symptom Name" /> <input type="text" id="sign_symptom_value_1" size="20" name="sign_symptom_value_1" value="" placeholder="Sign or Symptom Value" /> <a href="#" id="rmSignSymptom">Remove</a></p>
+    <p><input type="text" class="textbox1" name="sign_symptom_name_1" size="22" id="sign_symptom_name_1" value="" placeholder="Sign or Symptom Name" /> <input class="textbox2" type="text" id="sign_symptom_value_1" size="20" name="sign_symptom_value_1" value="" placeholder="Sign or Symptom Value" /> <a href="#" id="rmSignSymptom">Remove</a></p>
 </div>
 </form>
 
-<div id="diagnosis">
 
-</div>
-
-<strong><div id="echoResult"></div></strong>
+<table id="diagTable" class='CSSTableGenerator'>
+</table>
 
 {% endblock %}
 
-</head>
+</body>

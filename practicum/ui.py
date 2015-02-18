@@ -56,7 +56,7 @@ FLASK_DEBUG = True
 HOST = '0.0.0.0'
 PORT = 8080
 MODEL_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/code/practicum"
-TRAIN_RECORDS = 1000000  # Number of records to use in training the model.  I'd recommend 100-1000 times the number of diagnoses
+TRAIN_RECORDS = 100000  # Number of records to use in training the model.  I'd recommend 100-1000 times the number of diagnoses
 TEST_RECORDS = 10000  # Number of records to use to use in testing the model
 
 ## RECORDS STATIC VARIABLES
@@ -76,6 +76,8 @@ from collections import defaultdict
 import copy
 import imp
 import ConfigParser
+import operator
+import pprint
 
 ## SETUP
 __author__ = "Gabriel Bassett"
@@ -91,8 +93,8 @@ parser.add_argument('-v', '--verbose',
                     action="store_const", dest="loglevel", const=logging.INFO
                    )
 parser.add_argument('--log', help='Location of log file', default=None)
-parser.add_argument('host', help='ip address to use for hosting', default=None)
-parser.add_argument('port', help='port to host the app on', default=None)
+parser.add_argument('--host', help='ip address to use for hosting', default=None)
+parser.add_argument('--port', help='port to host the app on', default=None)
 args = parser.parse_args()
 
 # Parse Config File
@@ -128,22 +130,22 @@ if config_exists:
         #print 'config arules'  # DEBUG
         if 'host' in config.options('SERVER'):
             #print 'config rules'  # DEBUG
-            HOST = config.get('host', 'SERVER')
+            HOST = config.get('SERVER', 'host')
         if 'port' in config.options('SERVER'):
-            PORT = int(config.get('port', 'SERVER'))
+            PORT = int(config.get('SERVER', 'port'))
     if config.has_section('MEDICAL'):
         pass # TODO import medical variables and pass to synthetic and model modules
     if config.has_section('MODEL'):
         if 'diagnoses' in config.options('MODEL'):
-            DIAGNOSES = int(config.get('diagnoses', 'MODEL'))
+            DIAGNOSES = int(config.get('MODEL', 'diagnoses'))
         if 'signs' in config.options('MODEL'):
-            SIGNS = int(config.get('signs', 'MODEL'))
+            SIGNS = int(config.get('MODEL', 'signs'))
         if 'symptoms' in config.options('MODEL'):
-            SYMPTOMS = int(config.get('symptoms', 'MODEL'))
+            SYMPTOMS = int(config.get('MODEL', 'symptoms'))
         if 'training_records' in config.options('MODEL'):
-            TRAINING_RECORDS = int(config.get('training_records', 'MODEL'))
+            TRAIN_RECORDS = int(config.get('MODEL', 'training_records'))
         if 'model_dir' in config.options('MODEL'):
-            MODEL_DIR = config.get('model_dir', 'MODEL')
+            MODEL_DIR = config.get('MODEL', 'model_dir')
 
 # Parse Logging Arguments
 ## Set up Logging
@@ -168,7 +170,7 @@ synthetic = imp.load_module("synthetic", fp, pathname, description)
 print "Creating the synthetic data object 'data' and truth data."
 data = synthetic.test_data()
 # Create records
-print "Creating the synthetic noisy records."
+print "Creating {0} synthetic noisy records.".format(TRAIN_RECORDS)
 data.records = data.create_diagnosis_data(data.truth, TRAIN_RECORDS, data.default)
 
 # Train a model based on the synthetic data
@@ -180,6 +182,8 @@ print "Creating the medical decision support system object 'mdss'."
 mdss = model.decision_support_system()
 print "Creating the model."
 mdss.model = mdss.train_nx_model(data.records)
+
+
 
 # Set up the app
 app = Flask(__name__)
@@ -224,19 +228,32 @@ def gui():
 @app.route('/diagnose/', methods=['GET'])
 def diagnose():
     print request.args
+    items = request.args.items()
+    record = {'signs':{}, 'symptoms':{}}
+    try:
+        for i in range(len(items)):
+            sign_or_symptom = items[i][0].split("_")[0]  # TODO: make this less of a HACK
+            #print items
+            if sign_or_symptom == 'sign':
+                record['signs'][items[i][0]] = float(items[i][1])
+            elif sign_or_symptom == 'symptom':
+                record['symptoms'][items[i][0]] = float(items[i][1])
+    except Exception as e:
+        print e
 
-    record = {}
-    for i in range(len(request.args)):
-        # TODO: get the output into sign/symptom, name, value
-        pass
+    prediction = mdss.query_nx_model(record)
+    prediction = sorted(prediction.items(), key=operator.itemgetter(1), reverse=True)[0:5]
+    max_val = prediction[0][1]
+    prediction = [[k, "{0}%".format(round((max_val-v)/float(max_val), 7) * -100)] for k, v in prediction]
+    print "Returning predictions:"
+    pprint.pprint(prediction)
+    return jsonify(result=prediction)  # TODO: Parse the data a bit before returning it for peat's sake, and fix the scores
 
-    ret_data = mdss.query_nx_model(record)
-    return jsonify(ret_data)
 
 
 def main():
     logging.info('Beginning main loop.')
-
+    print "Model ready for use."
     app.run(host=HOST, port=PORT, debug=FLASK_DEBUG)
     logging.info('Ending main loop.')
 
