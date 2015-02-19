@@ -32,6 +32,7 @@ $(document).ready(function() {
             contentType: "application/json; charset=utf-8",
             data: o,
             success: function(data) {
+                $('#diagTable').empty();
                 var diag = data.result;
                 $('<tr> <td colspan=2>Diagnoses:</td></tr>').appendTo('#diagTable');
                 for (var i = 0; i < diag.length; i++) {
@@ -39,6 +40,7 @@ $(document).ready(function() {
                 };
             },
             error: function(jqXHR, textStatus, errorThrown) {
+                $('#diagTable').empty();
                 alert(errorThrown);
             }
         });
