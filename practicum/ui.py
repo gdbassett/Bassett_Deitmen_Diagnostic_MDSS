@@ -191,7 +191,8 @@ app = Flask(__name__)
 # define the API
 # Initialize the arguements
 api_parser = reqparse.RequestParser()
-#api_parser.add_argument('ASN1', type=str, help="First ASN of query. (Order doesn't matter.)", default=None)
+api_parser.add_argument('record_count', type=int, help="The number of records requested.", default=1)
+api_parser.add_argument('truth', type=str, help="The name of the diagnosis a truth record is being requested for.", default=None)
 #api_parser.add_argument('ASN2', type=str, help="Second ASN of query.  (Order doesn't matter.)", default=None)
 #api_parser.add_argument('verizon', type=bool, help="Report on verizon existance in ASN's paths.", default=False)
 #api_parser.add_argument('source', type=str, help="An ASN representing the source of the traffic", default=False)
@@ -199,25 +200,29 @@ api_parser = reqparse.RequestParser()
 
 
 # Initialize the API class
-class ui(Resource):
-    api_args = None
-    g = None
+class records(Resource):
+    api_parser = None
 
-    def __init__(self):
-        print "Loading Graph."
-        self.api_parser = parser
-        # TODO: Load connection to graph
-        print "Graph loaded."
+    def get(self):
+        self.api_parser = api_parser
+        api_args = self.api_parser.parse_args(strict=False)
+        records = data.create_diagnosis_data(data.truth, api_args.record_count, data.default)
+        return records
 
-    def post(self):
-        self.api_args = self.parser.parse_args()
-        # ToDO: Parse args and do something
+
+class truth(Resource):
+    api_parser = None
+
+    def get(self):
+        self.api_parser = api_parser
+        api_args = self.api_parser.parse_args()
+        return data.truth.get(api_args.truth, {'error': 'diagnosis does not exist in truth data.'})
 
 
 # Set up the API
 api = Api(app)
-api.add_resource(ui, '/api')
-
+api.add_resource(records, '/records/')
+api.add_resource(truth, '/truth/')
 
 # Set up the GUI
 @app.route("/")
