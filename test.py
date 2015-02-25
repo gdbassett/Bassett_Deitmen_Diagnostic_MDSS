@@ -168,19 +168,26 @@ def main():
         }
         for i in range(len(predicted_diagnoses)):
             # TODO: Make 'predictions' a matrix or dataframe
-            predictions = sorted(predicted_diagnoses[i].items(), key=operator.itemgetter(1), reverse=True)
-#            predictions = pd.DataFrame(data={"diagnosis":predicted_diagnoses[i].keys(), "score":predicted_diagnoses[i].values()})
-#            predictions.sort(columns='score', ascending=False, inplace=True)
-            if predictions[0][0] == truth_diagnoses[i]:
+#            predictions = sorted(predicted_diagnoses[i].items(), key=operator.itemgetter(1), reverse=True)
+            predictions = pd.DataFrame(data={"diagnosis":predicted_diagnoses[i].keys(), "score":predicted_diagnoses[i].values()})
+            predictions.sort(columns='score', ascending=False, inplace=True)
+#            if predictions[0][0] == truth_diagnoses[i]:
+            if predictions.iloc[0,0] == truth_diagnoses[i]:
                 results[NUM_TRAIN_RECORDS[i]]['top'] += 1
                 results[NUM_TRAIN_RECORDS[i]]['top5'] += 1
-            elif truth_diagnoses[i] in [key for key, value in predictions[0:5]]:
+#            elif truth_diagnoses[i] in [key for key, value in predictions[0:5]]:
+            elif truth_diagnoses[i] in list(predictions.iloc[0:5]):
                 results[NUM_TRAIN_RECORDS[i]]['top5'] += 1
             # todo: find location of the diagnosis in the sorted list of diagnoses
             # TODO: predictions.index(truth_diagnoses[i]) needs to be replaced with a real thing
             try:
-                loc = predictions.index(truth_diagnoses[i])
-                loc = loc + 1 # because values starting at 0 will confuse people
+#                loc = predictions.index(truth_diagnoses[i])
+                loc = predictions[predictions.diagnosis == truth_diagnoses[i]].index.tolist()
+                if len(loc) > 0:
+                    loc = loc[0]
+                    loc = int(loc) + 1 # because values starting at 0 will confuse people
+                else:
+                    loc = -1
             except ValueError:
                 loc = -1
             results[NUM_TRAIN_RECORDS[i]]['locs'].append(loc)
@@ -189,7 +196,7 @@ def main():
                 score_diff = 1
             else:
                 # TODO: predictions[0]['score'] and predictions[i-1]['score'] need to be replaced with real things
-                score_diff = round((predictions[0]['score']-predictions[i-1]['score'])/float(predictions[0]['score']), 7)
+                score_diff = round((predictions.iloc[0,1]-predictions.iloc[loc-1,1])/float(predictions.iloc[0,1]), 7)
             results[NUM_TRAIN_RECORDS[i]]['scores'].append(score_diff)
 
         print "Writing {0} training record results.".format(len(data.records))
