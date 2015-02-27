@@ -139,22 +139,21 @@ def main():
         print "Diagnosing the test records."
         truth_diagnoses = dict()
         predicted_diagnoses = dict()
-        for i in range(len(test_records)):
-            truth_diagnoses[i] = test_records[i].pop('diagnosis')
-            predicted_diagnoses[i] = mdss.query_nx_model(test_records[i])
+        for j in range(len(test_records)):
+            truth_diagnoses[j] = test_records[j].pop('diagnosis')
+            predicted_diagnoses[j] = mdss.query_nx_model(test_records[j])
 
         print "Scoring the predictions"
         # Count number in top 1 and 5
-        results[NUM_TEST_RECORDS[i]] = {
+        results[NUM_TRAIN_RECORDS[i]] = {
             'top': 0,
             'top5': 0,
             'locs': [],
             'scores': []
         }
-        for i in range(len(predicted_diagnoses)):
-            # TODO: Make 'predictions' a matrix or dataframe
+        for j in range(len(predicted_diagnoses)):
 #            predictions = sorted(predicted_diagnoses[i].items(), key=operator.itemgetter(1), reverse=True)
-            predictions = pd.DataFrame(data={"diagnosis":predicted_diagnoses[i].keys(), "score":predicted_diagnoses[i].values()})
+            predictions = pd.DataFrame(data={"diagnosis":predicted_diagnoses[j].keys(), "score":predicted_diagnoses[j].values()})
             predictions.sort(columns='score', ascending=False, inplace=True)
 #            if predictions[0][0] == truth_diagnoses[i]:
             if predictions.iloc[0,0] == truth_diagnoses[i]:
@@ -163,14 +162,12 @@ def main():
 #            elif truth_diagnoses[i] in [key for key, value in predictions[0:5]]:
             elif truth_diagnoses[i] in list(predictions.iloc[0:5]):
                 results[NUM_TRAIN_RECORDS[i]]['top5'] += 1
-            # todo: find location of the diagnosis in the sorted list of diagnoses
-            # TODO: predictions.index(truth_diagnoses[i]) needs to be replaced with a real thing
             try:
 #                loc = predictions.index(truth_diagnoses[i])
                 loc = predictions[predictions.diagnosis == truth_diagnoses[i]].index.tolist()
                 if len(loc) > 0:
                     loc = loc[0]
-                    loc = int(loc) + 1 # because values starting at 0 will confuse people
+                    loc = int(loc) + 1  # because values starting at 0 will confuse people
                 else:
                     loc = -1
             except ValueError:
@@ -180,12 +177,11 @@ def main():
             if loc == -1:
                 score_diff = 1
             else:
-                # TODO: predictions[0]['score'] and predictions[i-1]['score'] need to be replaced with real things
                 score_diff = round((predictions.iloc[0,1]-predictions.iloc[loc-1,1])/float(predictions.iloc[0,1]), 7)
             results[NUM_TRAIN_RECORDS[i]]['scores'].append(score_diff)
 
         print "Writing {0} training record results.".format(len(data.records))
-        with open(RESULTS_FILE, 'r') as f:
+        with open(RESULTS_FILE, 'w') as f:
             json.dump(results, f)
 
     print "Score the predictions."
