@@ -6,22 +6,7 @@
  Copyright 2015 Gabriel Bassett
 
  LICENSE:
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
+ This software is not licenced for use by those other than the author.
 
  DESCRIPTION:
  <A description of the software>
@@ -37,7 +22,7 @@ under the License.
 
 """
 
-# this code can be used for manually running t
+# this code can be used for manually testing the model
 """
 GIT_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/code/practicum"
 NUM_TRAIN_RECORDS = 1000000  # Number of records to use in training the model.  I'd recommend 100-1000 times the number of diagnoses
@@ -88,7 +73,7 @@ import logging
 # USER VARIABLES
 GIT_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/code/practicum"
 #NUM_TRAIN_RECORDS = 1000000  # Number of records to use in training the model.  I'd recommend 100-1000 times the number of diagnoses
-NUM_TEST_RECORDS = 10000  # Number of records to use to use in testing the model
+NUM_TEST_RECORDS = 1000  # Number of records to use to use in testing the model
 NUM_TRAIN_RECORDS = [100000, 200000, 400000, 600000, 800000, 1000000, 1300000, 1600000, 2500000, 3200000, 5000000]  # list of training record counts to test at
 RESULTS_FILE = "/Users/v685573/OneDrive/Documents/MSIA5243/practicum/results.json"
 LOG_LEVEL = logging.DEBUG
@@ -133,11 +118,11 @@ def main():
 
     # Create records
     print "Starting the record creation and testing loop."
-    for i in range(len(NUM_TEST_RECORDS)):
+    for i in range(len(NUM_TRAIN_RECORDS)):
         if i == 0:
-            record_increment = NUM_TEST_RECORDS[i]
+            record_increment = NUM_TRAIN_RECORDS[i]
         else:
-            record_increment = NUM_TEST_RECORDS[i] - NUM_TEST_RECORDS[i - 1]
+            record_increment = NUM_TRAIN_RECORDS[i] - NUM_TRAIN_RECORDS[i - 1]
         print "Creating {0} more synthetic noisy records for a total of {1}.".format(record_increment, len(data.records) + record_increment)
         data.records = data.records + data.create_diagnosis_data(data.truth, record_increment, data.default)
         # Train a model based on the synthetic data
@@ -148,7 +133,7 @@ def main():
         mdss.model = mdss.train_nx_model(data.records)
 
         # Use the model to make diagnoses and see how well it did
-        print "Generating {0} testing records 'test_records' for {0} trainging records.".format(NUM_TEST_RECORDS, len(data.records))
+        print "Generating {0} testing records 'test_records' for {1} training records.".format(NUM_TEST_RECORDS, len(data.records))
         test_records = data.create_diagnosis_data(data.truth, NUM_TEST_RECORDS, data.default)
 
         print "Diagnosing the test records."
