@@ -155,16 +155,17 @@ def main():
 #            predictions = sorted(predicted_diagnoses[i].items(), key=operator.itemgetter(1), reverse=True)
             predictions = pd.DataFrame(data={"diagnosis":predicted_diagnoses[j].keys(), "score":predicted_diagnoses[j].values()})
             predictions.sort(columns='score', ascending=False, inplace=True)
-#            if predictions[0][0] == truth_diagnoses[i]:
-            if predictions.iloc[0,0] == truth_diagnoses[i]:
+            predictions.reset_index(drop=True, inplace=True)
+#            if predictions[0][0] == truth_diagnoses[j]:
+            if predictions.iloc[0,0] == truth_diagnoses[j]:
                 results[NUM_TRAIN_RECORDS[i]]['top'] += 1
                 results[NUM_TRAIN_RECORDS[i]]['top5'] += 1
-#            elif truth_diagnoses[i] in [key for key, value in predictions[0:5]]:
-            elif truth_diagnoses[i] in list(predictions.iloc[0:5]):
+#            elif truth_diagnoses[j] in [key for key, value in predictions[0:5]]:
+            elif truth_diagnoses[j] in list(predictions.iloc[0:5,0]):
                 results[NUM_TRAIN_RECORDS[i]]['top5'] += 1
             try:
-#                loc = predictions.index(truth_diagnoses[i])
-                loc = predictions[predictions.diagnosis == truth_diagnoses[i]].index.tolist()
+#                loc = predictions.index(truth_diagnoses[j])
+                loc = predictions[predictions.diagnosis == truth_diagnoses[j]].index.tolist()
                 if len(loc) > 0:
                     loc = loc[0]
                     loc = int(loc) + 1  # because values starting at 0 will confuse people
