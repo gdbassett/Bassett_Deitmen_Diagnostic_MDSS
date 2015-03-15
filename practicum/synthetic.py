@@ -36,6 +36,7 @@ np.random.seed(5052015)
 DIAGNOSES = 10000
 SIGNS = 3000
 SYMPTOMS = 150
+TESTS = SIGNS  # There is 1 test for each sign
 TREATMENTS = # PUT A NUMBER HERE
 MAX_TREATED = 100  # The maximum number of diagnoses a treatment will treat
 SIGNS_PER_DIAG_MEAN = 5.5
@@ -226,6 +227,8 @@ class test_data():
         :param SnS_dist: the median and standard distribution of the number of signs and symptoms in medical lieterature
         :return: a dictionary of {diagnosis: [list of signs and symptoms]} picked probabilistically to create the requested distribution
         """
+        #TODO: Return signs, symptoms, and diagnoses and place in the class
+
         # Create Data Sets
         diagnoses = ["diagnosis_{0}".format(x) for x in range(DIAGNOSES)]  # Generate Diagnoses
         signs = ["sign_{0}".format(x) for x in range(SIGNS)]  # Generate Signs
@@ -336,6 +339,10 @@ class test_data():
 
 
     def create_treatments(self):
+        """
+
+        :return: a dictionary with keys of treatments and values of dictionaries keyed with diagnoses, signs, and symptoms and values of type and impact
+        """
         # based on a number ot treatments (TREATMENTS)
         # TODO: Create a log normal distribution where most treatments help 1
         treatments = dict()
@@ -347,9 +354,35 @@ class test_data():
             # TODO: randomly select a number of diagnoses to treat
 
 
-    def create_tests(self):
-        # TODO: create one test per sign and return the linkage
-        # TODO: Probably good to support more than 1 so a dictionary
+    def create_tests(self, truth_data = None):
+        """
+
+        :return: dictionary of dictionaries with keys of tests and values of dictionaries with keys of signs
+
+        NOTE: Supports more than 1 sign per test as well as other features by using dictionary of dictionaries
+        """
+        # If truth_data is None, default to truth data in module
+        if truth_data is None:
+            truth_data = self.truth
+        if truth_data is None:
+            raise ValueError("Truth data must either be passed to the function or exist in the object.")
+
+        # get list of signs from diagnoses
+        signs = set()
+        for diagnosis in truth_data.values():
+            signs = signs.add(diagnosis['signs'].keys())
+        signs = list(signs)
+
+        # randomize signs
+        np.random.shuffle(signs)
+
+        tests = dict()
+        for i in range(TESTS):
+            if i >= len(signs):
+                break
+            # Create one test per sign and return the linkage
+            tests["test_{0}".format(i)] = {signs[i]:{}}
+
         pass
 
 
