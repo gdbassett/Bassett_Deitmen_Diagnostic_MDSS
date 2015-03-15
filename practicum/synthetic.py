@@ -338,23 +338,58 @@ class test_data():
             return truth
 
 
-    def create_treatments(self):
+    def create_treatments(self, truth_data=None):
         """
 
         :return: a dictionary with keys of treatments and values of dictionaries keyed with diagnoses, signs, and symptoms and values of type and impact
         """
-        # based on a number ot treatments (TREATMENTS)
-        # TODO: Create a log normal distribution where most treatments help 1
+         # If truth_data is None, default to truth data in module
+        if truth_data is None:
+            truth_data = self.truth
+        if truth_data is None:
+            raise ValueError("Truth data must either be passed to the function or exist in the object.")
+
+        # get list of signs, symptoms, and diagnoses
+        signs = set()
+        symptoms = set()
+        diagnoses = truth_data.keys()
+        for diagnosis in truth_data.values():
+            signs = signs.add(diagnosis['signs'].keys())
+            symptoms = symptoms.add(diagnosis['symptoms'].keys())
+        signs = list(signs)
+        symptoms = list(symptoms)
+
         treatments = dict()
-        for i in range(TREATMENTS):
-            # TODO: add treatment
-            # TODO: identify the number of diagnoses it will treat (treated)
-            if treated > MAX_TREATED:
-                treated = MAX_TREATED
-            # TODO: randomly select a number of diagnoses to treat
+
+        # Create treatments for diagnoses
+        # TODO: Create diagnoses distribution
+        # pick treatments for the diagnoses
+        for diagnosis in diagnoses:
+            #todo: pick a number of treatments
+            for treatment in treatment_per:
+                # todo: pick treatments with preferential attachment
+                # todo: store diagnosis on that treatment
+
+        # Create treatments for signs
+        # TODO: Create signs distribution
+        # pick treatements for the signs
+        for sign in signs:
+            #todo: pick a number of treatments
+            for treatment in treatment_per:
+                # todo: pick treatments with preferential attachment
+                # todo: store sign on that treatment
+
+        # Create treatments for symptoms
+        # TODO: Create symptoms distribution
+        # pick treatments for the symptoms
+        for symptom in symptoms:
+            #todo: pick a number of treatments
+            for treatment in treatment_per:
+                # todo: pick treatments with preferential attachment
+                # todo: store symptom on that treatment
 
 
-    def create_tests(self, truth_data = None):
+    def create_tests(self, truth_data=None):
         """
 
         :return: dictionary of dictionaries with keys of tests and values of dictionaries with keys of signs
