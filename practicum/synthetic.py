@@ -37,7 +37,6 @@ DIAGNOSES = 10000
 SIGNS = 3000
 SYMPTOMS = 150
 TESTS = SIGNS  # There is 1 test for each sign
-TREATMENTS = # PUT A NUMBER HERE
 MAX_TREATED = 100  # The maximum number of diagnoses a treatment will treat
 SIGNS_PER_DIAG_MEAN = 5.5
 SIGNS_PER_DIAG_SD = 0.5  # Increased from 0.25 to give a bit of variance consistent with physician suggestion
@@ -359,34 +358,117 @@ class test_data():
         signs = list(signs)
         symptoms = list(symptoms)
 
-        treatments = dict()
+        treatments = defaultdict(dict)
+
+        #  1. Create a fair coin
+        coin = scipy.stats.bernoulli(.5)
+        # Create a coin that comes up true 1/5 of the time
+        coin_fifth = scipy.stats.bernoulli(.8)
+
 
         # Create treatments for diagnoses
-        # TODO: Create diagnoses distribution
+        # Create diagnoses distribution
+        # The below beta prime distribution creates a distribution where a fair number (~23% of diagnoses have
+        #  no treatment and a small percent (~2%) have more than 10 treatments)
+        dist = scipy.stats.betaprime(5, 3)
+        #  0. Create a list of used treatments
+        used_treatments = list()
         # pick treatments for the diagnoses
         for diagnosis in diagnoses:
-            #todo: pick a number of treatments
-            for treatment in treatment_per:
-                # todo: pick treatments with preferential attachment
-                # todo: store diagnosis on that treatment
+            type = 'diagnosis'
+            # pick a number of treatments
+            treatments_per = int(dist.rvs())
+            for treatment in treatments_per:
+                # prefer treatments treat a single diagnosis/sign/symptom, otherwise preferentially attach to treat lots of things
+                # 2. Flip it
+                if len(used_treatments) > 0 and coin.rvs():
+                    # use an existing treatment
+                    t = np.random.choice(used_treatments)
+                else:
+                    # Create a new treatment
+                    t = "treatment_{0}".format(len(set(used_treatments)))
+                used_treatments.append(t)
+
+                #Give the treatment an impact score (either 'cures' or a normal distribution of mean=1, sd = 1/3
+                impact_dist = scipy.stats.norm(1, 1/float(3))
+                if coin_fifth.rvs():
+                    impact = 'max'
+                else:
+                    impact = impact_dist.rvs()
+                # store the treatment
+                treatments[t][diagnosis] = {'type':'diagnosis', 'impact':impact}
 
         # Create treatments for signs
-        # TODO: Create signs distribution
-        # pick treatements for the signs
+        # Create signs distribution
+        # The below lognormal distribution starts at 1 and roughly goes down to 10
+        dist = scipy.stats.lognorm(.95, loc=1)
+        #  0. Create a list of used treatments
+        used_treatments = list()
+        # pick treatments for the signs
         for sign in signs:
-            #todo: pick a number of treatments
-            for treatment in treatment_per:
-                # todo: pick treatments with preferential attachment
-                # todo: store sign on that treatment
+            # pick a number of treatments
+            treatments_per = int(dist.rvs())
+            # we don't want anything over 10
+            if treatments_per > 10:
+                treatments_per = 1
+            for treatment in treatments_per:
+                # prefer treatments treat a single diagnosis/sign/symptom, otherwise preferentially attach to treat lots of things
+                # 2. Flip it
+                if len(used_treatments) > 0 and coin.rvs():
+                    # use an existing treatment
+                    t = np.random.choice(used_treatments)
+                else:
+                    # Create a new treatment
+                    t = "treatment_{0}".format(len(set(used_treatments)))
+                used_treatments.append(t)
+
+                #Give the treatment an impact score (either 'cures' or a normal distribution of mean=1, sd = 1/3
+                impact_dist = scipy.stats.norm(1, 1/float(3))
+                if coin_fifth.rvs():
+                    impact = 'max'
+                else:
+                    impact = impact_dist.rvs()
+                # store the treatment
+                treatments[t][sign] = {'type':'sign', 'impact':impact}
 
         # Create treatments for symptoms
-        # TODO: Create symptoms distribution
+        # Create symptoms distribution
+        # Use a gamma distribution to get a long tail (out to about a max of 100)
+        dist = scipy.stats.gamma(.008, scale=20, loc=2)  # Produces a long tail
+        # if the value is below 5, use a normal scale with a mean of 2
+        dist2 = scipy.stats.norm(2.5, scale=.5)
+        #  0. Create a list of used treatments
+        used_treatments = list()
         # pick treatments for the symptoms
         for symptom in symptoms:
-            #todo: pick a number of treatments
-            for treatment in treatment_per:
-                # todo: pick treatments with preferential attachment
-                # todo: store symptom on that treatment
+            # Pick a number of treatments
+            treatments_per = int(dist.rvs())
+            if treatments_per < 5:
+                treatments_per = int(dist2.rvs())
+            if treatments_per < 0:
+                treatments_per = 0
+            for treatment in treatments_per:
+                # prefer treatments treat a single diagnosis/sign/symptom, otherwise preferentially attach to treat lots of things
+                # 2. Flip it
+                if len(used_treatments) > 0 and coin.rvs():
+                    # use an existing treatment
+                    t = np.random.choice(used_treatments)
+                else:
+                    # Create a new treatment
+                    t = "treatment_{0}".format(len(set(used_treatments)))
+                used_treatments.append(t)
+
+                #Give the treatment an impact score (either 'cures' or a normal distribution of mean=1, sd = 1/3
+                impact_dist = scipy.stats.norm(1, 1/float(3))
+                if coin_fifth.rvs():
+                    impact = 'max'
+                else:
+                    impact = impact_dist.rvs()
+                # store the treatment
+                treatments[t][symptom] = {'type':'symptom', 'impact':impact}
+
+        # return the dictionary of treatment-diagnosis/sign/symptom mappings with impact scores
+        return treatments
 
 
     def create_tests(self, truth_data=None):
@@ -639,19 +721,7 @@ class test_data():
 
 def main():
     logging.info('Beginning main loop.')
-
-    # Initialize the arguements
-    api_parser = reqparse.RequestParser()
-    #api_parser.add_argument('ASN1', type=str, help="First ASN of query. (Order doesn't matter.)", default=None)
-    #api_parser.add_argument('ASN2', type=str, help="Second ASN of query.  (Order doesn't matter.)", default=None)
-    #api_parser.add_argument('verizon', type=bool, help="Report on verizon existance in ASN's paths.", default=False)
-    #api_parser.add_argument('source', type=str, help="An ASN representing the source of the traffic", default=False)
-    #api_parser.add_argument('destination', type=str, help="An IP address or subnet destination." , default=False)
-
-    app = Flask(__name__)
-    api = Api(app)
-    api.add_resource(ASNSearch, '/')
-    app.run(debug=True)
+    # nothing happens here.  Use the class.
     logging.info('Ending main loop.')
 
 if __name__ == "__main__":
