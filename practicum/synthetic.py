@@ -36,6 +36,8 @@ np.random.seed(5052015)
 DIAGNOSES = 10000
 SIGNS = 3000
 SYMPTOMS = 150
+TREATMENTS = # PUT A NUMBER HERE
+MAX_TREATED = 100  # The maximum number of diagnoses a treatment will treat
 SIGNS_PER_DIAG_MEAN = 5.5
 SIGNS_PER_DIAG_SD = 0.5  # Increased from 0.25 to give a bit of variance consistent with physician suggestion
 SYMPTOMS_PER_DIAG_MEAN = 7 
@@ -331,6 +333,24 @@ class test_data():
             return truth, default
         else:
             return truth
+
+
+    def create_treatments(self):
+        # based on a number ot treatments (TREATMENTS)
+        # TODO: Create a log normal distribution where most treatments help 1
+        treatments = dict()
+        for i in range(TREATMENTS):
+            # TODO: add treatment
+            # TODO: identify the number of diagnoses it will treat (treated)
+            if treated > MAX_TREATED:
+                treated = MAX_TREATED
+            # TODO: randomly select a number of diagnoses to treat
+
+
+    def create_tests(self):
+        # TODO: create one test per sign and return the linkage
+        # TODO: Probably good to support more than 1 so a dictionary
+        pass
 
 
     def dist_3_step(self, x, levels):

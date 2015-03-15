@@ -286,6 +286,43 @@ class decision_support_system():
         return scores
 
 
+    def query_tests(self, potential_diagnoses, diagnoses_to_consider=20, differential_type='individual'):
+        # given the scored potential diagnoses
+        # get successor nodes (sign/symptoms)
+        # remove the symptoms
+        #  differential type = individual, best_split, or both
+        # pick the signs that most evenly separate the to diagnoses_to_consider diagnoses
+        ## I want a sign that is as close to 10 (#/2) of the top 20 diagnoses as possible <- the best sign
+        # also get signs that is only related to one of the top 20 diagnoses <- The one doctors do
+        # get the test for each sign
+        # see how well the distribution of division of signs/symptoms as going down the score list
+        pass
+
+
+    def query_treatments(self, potential_diagnoses, diagnoses_to_consider=20):
+        # given a scored list of potential diagnosis,
+        potential_treatments = list()  # list may need to be changed
+        # for the top (diagnoses_to_consider) diagnoses:
+        #   get successor treatments (record it as a diagnosis treatment)
+        # get successor treatments to signs (record it as a sign/symptom treatment)
+        #    filter by positive relationships (may want to keep negative relationships to show)
+        # get successor treatments to symptoms (record it as a sign/symptom treatment)
+        #   filter by positive relationships (may want to keep negative relationships to show)
+        # for each potential_treatment:
+        #   get all predecessors with negative relationships
+        #   if the negative relationship is in the top (SOME CUTOFF.  SAY 99.7%): drop it
+        #   else: record the location in the scored potential diagnoses list
+        # Order diagnoses by:
+        # 1. It treats diagnoses
+        # 1.1 It treats the most (diagnoses to consider) diagnoses
+        # 1.2 Lowest negative effect location
+        # 2. It treats signs/symptoms
+        # 2.1 Sorted by negative effect location
+        # Return potential treatments, ordered, with (sign/sympotm vs diagnosis, # treated, highest negative effect loc)
+
+        pass
+
+
     def train_nx_model(self, records):
         """
         :param records: Takes a list of medical records (synthetic or otherwise) in the form {diagnosis:"", signs:{}, symptoms:{}}
