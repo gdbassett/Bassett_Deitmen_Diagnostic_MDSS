@@ -104,6 +104,36 @@ class decision_support_system():
         pass
 
 
+    def add_treatments_to_model_nx(self, treatment_data):
+        # If the model hasn't been built, error
+        if self.model is None:
+            raise TypeError("Model does not appear to be built.  Please build the model before incorporating treatment"
+                            " data.")
+
+        for treatment in treatment_data.keys():
+            if treatment not in self.model.nodes():
+                self.model.add_node(treatment, {'type':'treatment'})
+            for dss in treatment_data[treatment].keys():  # dss = diagnosis, sign, symptom
+                if dss not in self.model.nodes():
+                    self.model.add_node(dss, {'type':treatment_data[treatment][dss]['type']})
+                self.model.add_edge(treatment, dss, attr_dict={'impact':treatment_data[treatment][dss]['impact']})
+
+
+    def add_tests_to_model_nx(self, test_data):
+        # If the model hasn't been built, error
+        if self.model is None:
+            raise TypeError("Model does not appear to be built.  Please build the model before incorporating test data.")
+
+        # For each test, get the diagnoses it's linked to through signs
+        for test in test_data.keys():
+            if test not in self.model.nodes():
+                self.model.add_node(test, {'type':'test'})
+            for sign in test_data[test].keys():
+                    if sign not in self.model.nodes():
+                        self.model.add_node(sign, {'type':'sign'})
+                    self.model.add_edge(test, sign, attr_dict={'confidence':test_data[test][sign]['confidence']})
+
+
     def build_model_nx(self, g1=None):
         """
         :param g1: a networkx MultiDiGraph with nodes for signs/symptoms and diagnoses and edges from signs/symptoms to the diagnoses
@@ -186,21 +216,6 @@ class decision_support_system():
 
         # boom.  model.
         return g2
-
-
-    def build_test_model(self, test_data):
-        # If the model hasn't been built, error
-        if self.model is None:
-            raise TypeError("Model does not appear to be built.  Please build the model before incorporating test data.")
-
-        # For each test, get the diagnoses it's linked to through signs
-        for test in test_data.keys():
-            if test not in self.model.nodes():
-                self.model.add_node(test, {'type':'test'})
-            for sign in test_data[test].keys():
-                    if sign not in self.model.nodes():
-                        self.model.add_node(self, {'type':'sign'})
-                    self.model.add_edge(test, sign, attr_dict={'confidence':test_data[test][sign]['confidence']})
 
 
     def injest_records_nx(self, records):
