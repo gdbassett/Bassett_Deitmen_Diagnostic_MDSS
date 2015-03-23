@@ -474,7 +474,7 @@ class test_data():
     def create_tests(self, truth_data=None):
         """
 
-        :return: dictionary of dictionaries with keys of tests and values of dictionaries with keys of signs
+        :return: dictionary of dictionaries with keys of tests and values of dictionaries with keys of signs and values including confidence
 
         NOTE: Supports more than 1 sign per test as well as other features by using dictionary of dictionaries
         """
@@ -497,10 +497,12 @@ class test_data():
         for i in range(TESTS):
             if i >= len(signs):
                 break
+            # confidence is picked from an exponential distribution normalized to 1 to 0 (at 5-9's)
+            confidence = abs((10-scipy.stats.expon.rvs())/10)
             # Create one test per sign and return the linkage
-            tests["test_{0}".format(i)] = {signs[i]:{}}
+            tests["test_{0}".format(i)] = {signs[i]:{'confidence':confidence}}
 
-        pass
+        return tests
 
 
     def dist_3_step(self, x, levels):
