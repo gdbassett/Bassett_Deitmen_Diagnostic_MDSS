@@ -97,6 +97,7 @@ class decision_support_system():
     signs = None
     symptoms = None
     diagnoses = None
+    test_model = None
 
 
     def __init__(self):
@@ -185,6 +186,22 @@ class decision_support_system():
 
         # boom.  model.
         return g2
+
+
+    def build_test_model(self, test_data):
+        # If the model hasn't been built, error
+        if self.model is None:
+            raise TypeError("Model does not appear to be built.  Please build the model before incorporating test data.")
+
+        # For each test, get the diagnoses it's linked to through signs
+        for test in test_data.keys():
+            if test not in self.model.nodes():
+                self.model.add_node(test, {'type':'test'})
+            for sign in test_data[test].keys():
+                    if sign not in self.model.nodes():
+                        self.model.add_node(self, {'type':'sign'})
+                    self.model.add_edge(test, sign, attr_dict={'confidence':test_data[test][sign]['confidence']})
+
 
     def injest_records_nx(self, records):
         """
@@ -299,19 +316,99 @@ class decision_support_system():
         return scores
 
 
-    def query_tests(self, potential_diagnoses, diagnoses_to_consider=20, differential_type='individual'):
-        # given the scored potential diagnoses
-        # get successor nodes (sign/symptoms)
-        # remove the symptoms
-        #  differential type = individual, best_split, or both
-        # pick the signs that most evenly separate the to diagnoses_to_consider diagnoses
-        ## I want a sign that is as close to 10 (#/2) of the top 20 diagnoses as possible <- the best sign
-        # also get signs that is only related to one of the top 20 diagnoses <- The one doctors do
-        # get the test for each sign
-        # see how well the distribution of division of signs/symptoms as going down the score list
-        pass
+    def query_tests(self, record, potential_diagnoses, diagnoses_to_consider=30, differential_type='individual'):
+        """
+
+        :param record: The dictionary record for which tests are identified
+        :param potential_diagnoses: The ouptut of the query_nx_model function
+        :param diagnoses_to_consider: The number of diagnoses to consider relevant
+        :param differential_type: How to determine tests.  'individual' indicates a set of tests to uniquely test each diagnosis.  'split' produces a test which best splits the diagnoses to consider, 'subset' (NOT YET IMPLEMENTED) will produce a minimal subset of tests to uniquely identify a diagnosis among the diagnoses to consider.
+        :return: list of tuples of (diagnosis, list of tests in priority order)
+        """
+
+        if differential_type not in ('individual', 'subset', 'split'):
+            raise ValueError("differential_type must be 'individual' meaning attempt to find tests which attempt to"
+                             "definitively confirm or deny single diagnoses or 'subset' meaning tests meant to "
+                             "subset the top potential diagnoses, or 'split' for a single test which best splits"
+                             "the diagnoses.")
 
 
+        # Subset to the potential diagnoses to be subsetted
+        L = sorted(potential_diagnoses.items(), key=lambda (k, v): v)
+        L =map(lambda (k,v): k, L)
+        L = L[0:diagnoses_to_consider]
+        # get signs
+        potential_tests = set()
+        test_model = nx.DiGraph()
+        for diagnosis in L:
+            for sign in self.model.predecessors(diagnosis):
+                # remove the symptoms
+                # remove signs in the record
+                if self.model.node[sign]['type'] == 'sign' and sign not in record['signs'].keys():
+                    for test in self.model.predecessors(sign):
+                        if self.model.node[test]['type'] == 'test':
+                            confidence = self.model.edge[test][sign]['confidence']
+                            # TODO: Could potentially weight the confidence with the sign->diagnosis function here.
+                            #         One option is to weight by how much the function differs from the uniform distribution
+                            #         This would be how well the function can differentiate.
+                            test_model.add_edge(test, diagnosis, attr_dict={'confidence':confidence})
+                            potential_tests.add(test)
+
+        if differential_type in ('individual'):
+            ind_tests = list()
+            # starting with the top diagnosis and working our way down
+            for i in range(len(L)):
+                diagnosis = []
+                # get all of the tests for that diagnosis.
+                diag_tests = test_model.predecessors(L[i])
+                # if zero, pass the logic and add the empty list
+                if len(diag_tests) >= 0:
+                    # Get edge degrees
+                    diag_tests = [(t, test_model.out_degree(t)) for t in diag_tests]
+                    # Get the tests that describe the minimum number of diagnoses
+                    min_diag = min([x[1] for x in diag_tests])
+                    diag_tests = [(t, test_model.edge[test][L[i]]['confidence']) for t, deg in diag_tests if deg <= min_diag]
+                    # sort the list by confidence
+                    diag_tests.sort(key=lambda tup: tup[1], reverse=True)
+                    # put the list with the diagnosis in the overall list
+                    diagnosis = ind_tests
+                ind_tests.append((L[i], diagnosis))
+
+                return ind_tests
+
+        if differential_type in ('subset'):
+            # TODO: This script finds  a set of tests which completely unique
+            # could build an array with tests as columns and diagnoses as rows and find the minimum columsn to produce a candidate key
+            raise AttributeError("subset function not yet implemented.")
+
+
+        if differential_type in ('split'):
+            split_test = (None, 100)  # 100 should ensure it is replaced
+            target = diagnoses_to_consider/float(2)
+            for t in potential_tests:
+                diff = abs(target - test_model.out_degree(t))
+                # if diff is closer to the bisection, keep that test
+                if diff < split_test[1]:
+                    split_test = (t, diff)
+                # could do an elif if the distance is equal and try and find the test related to the highest diagnosis
+                #  too much work for now though
+
+            # get the diagnoses and scores for the test
+            ret = []
+            diags = test_model.successors(split_test[0])
+            for i in range(len(L)):
+                if L[i] in diags:
+                    ret.append((L[i], [split_test[0]]))
+                else:
+                    ret.append((L[i], []))
+
+            return ret
+
+        raise StandardError("Reached the end of the function without returning  tests.")
+
+
+
+    # TODO: create subgraph of sign/symptom/diagnosis <- treatment and iterate over it
     def query_treatments(self, potential_diagnoses, diagnoses_to_consider=20):
         # given a scored list of potential diagnosis,
         potential_treatments = list()  # list may need to be changed
