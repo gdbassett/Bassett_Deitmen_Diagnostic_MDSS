@@ -6,7 +6,7 @@
  Copyright 2015 Gabriel Bassett
 
  LICENSE:
-Copyright [2015] [Gabriel Bassett]
+Copyright 2015 Gabriel Bassett
 
 Licensed under the Apache License, Version 2.0 (the "License") for non-commercial use only;
 you may not use this file except in compliance with the License.
