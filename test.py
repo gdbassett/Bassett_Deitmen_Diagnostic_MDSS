@@ -6,7 +6,21 @@
  Copyright 2015 Gabriel Bassett
 
  LICENSE:
- This software is not licenced for use by those other than the author.
+Copyright [2015] [Gabriel Bassett]
+
+Licensed under the Apache License, Version 2.0 (the "License") for non-commercial use only;
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+To request a commercial license, please contact the author at gabe@infosecanalytics.com
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
  DESCRIPTION:
  <A description of the software>
@@ -24,7 +38,7 @@
 
 # this code can be used for manually testing the model
 """
-GIT_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/code/practicum"
+GIT_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/practicum/code/practicum"
 NUM_TRAIN_RECORDS = 1000000  # Number of records to use in training the model.  I'd recommend 100-1000 times the number of diagnoses
 NUM_TEST_RECORDS = 10000  # Number of records to use to use in testing the model
 import imp
@@ -71,7 +85,7 @@ import logging
 
 
 # USER VARIABLES
-GIT_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/code/practicum"
+GIT_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/practicum/code/practicum"
 #NUM_TRAIN_RECORDS = 1000000  # Number of records to use in training the model.  I'd recommend 100-1000 times the number of diagnoses
 NUM_TEST_RECORDS = 1000  # Number of records to use to use in testing the model
 NUM_TRAIN_RECORDS = [100000, 200000, 400000, 600000, 800000, 1000000, 1300000, 1600000, 2500000, 3200000, 5000000]  # list of training record counts to test at
