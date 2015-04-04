@@ -456,7 +456,7 @@ class decision_support_system():
         L = sorted(potential_diagnoses.items(), key=lambda (k, v): v)
         L =map(lambda (k,v): k, L)
 
-        TODO: Needs to be rewritten to produce subgraph as this version will overwrite treatments in the dictionary
+        #TODO: Needs to be rewritten to produce subgraph as this version will overwrite treatments in the dictionary
         '''
         potential_treatments = dict()
         # for the top (diagnoses_to_consider) diagnoses:
@@ -484,6 +484,7 @@ class decision_support_system():
                     impact = self.model.edge[symptom][predecessor]['impact']
                     potential_treatments[predecessor] = {'source_type':'symptom', 'source':symptom, 'impact':impact}
         '''
+        ### START REWRITE OF ABOVE SECTION.  NOT COMPLETE ####
         nodes = set()
         potential_greatments_dict = dict()
         # for the top (diagnoses_to_consider) diagnoses:
@@ -517,6 +518,7 @@ class decision_support_system():
                     potential_greatments_dict[predecessor] = {'source_type':'diagnosis',
                                                          'source':L[i], 'diagnosis_rank':i}
                     nodes.add(predecessor)
+        ###### END REWRITE OF ABOVE SECTION.  NOT COMPLETE #####
 
         potential_treatments_graph = self.model.subgraph(nodes)
 
