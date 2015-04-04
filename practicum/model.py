@@ -6,11 +6,24 @@
  Copyright 2014 Gabriel Bassett
 
  LICENSE:
- This software is not licenced for use by those other than the author.
-'''
+Copyright [2015] [Gabriel Bassett]
+
+Licensed under the Apache License, Version 2.0 (the "License") for non-commercial use only;
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+To request a commercial license, please contact the author at gabe@infosecanalytics.com
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
  DESCRIPTION:
- Implmementation of a graph-based medical decision support system.
+ Implementation of a graph-based medical decision support system.
 
  CAVEAT:
  - The model assumes that signs and symptoms are known to be continuous or categorical and one-sided (bool & log), 2-sided (normal & 3-level), or progressive (linear & 10-step)
@@ -424,15 +437,104 @@ class decision_support_system():
 
 
     # TODO: create subgraph of sign/symptom/diagnosis <- treatment and iterate over it
-    def query_treatments(self, potential_diagnoses, diagnoses_to_consider=20):
+    def query_treatments(self, potential_diagnoses, record, diagnoses_to_consider=30, treatment_type='cures', negative_impacts=None):
+        """
+
+        :param record: The dictionary record for which tests are identified
+        :param potential_diagnoses: The ouptut of the query_nx_model function
+        :param diagnoses_to_consider: The number of diagnoses to consider relevant
+        :param treatment_type: 'cures' attempts to find one treatment to cure each of the top diagnoses_to_consider diagnoses, 'top' finds the single, best, treatment, and 'coverage', attempts to find the most efficient/best coverage of the top diagnoses_to_consider diagnoses
+        :param negative_impacts: The length down the diagnoses list to look for negative impacts from treatments.
+        :return: list of tuples of (diagnosis, list of treatments in priority order)
+        """
+        # if no cutoff for negative impacts is specified, use all of them
+        if negative_impacts is None:
+            negative_impacts = len(potential_diagnoses)
+
         # given a scored list of potential diagnosis,
-        potential_treatments = list()  # list may need to be changed
+        # Subset to the potential diagnoses to be subsetted
+        L = sorted(potential_diagnoses.items(), key=lambda (k, v): v)
+        L =map(lambda (k,v): k, L)
+
+        TODO: Needs to be rewritten to produce subgraph as this version will overwrite treatments in the dictionary
+        '''
+        potential_treatments = dict()
         # for the top (diagnoses_to_consider) diagnoses:
-        #   get successor treatments (record it as a diagnosis treatment)
+        for i in range(len(L)):
+            #   get successor treatments (record it as a diagnosis treatment)
+            for predecessor in self.model.predecessors(L[i]):
+                if self.model.node[predecessor]['type'] == 'treatment':
+                    impact = self.model.edge[L[i]][predecessor]['impact']
+                    # keep all effects in the top diagnoses_to_consider or any negative effects)
+                    if (impact > 0 and i < negative_impacts) or i < diagnoses_to_consider:
+                        potential_treatments[predecessor] = {'source_type':'diagnosis',
+                                                             'source':L[i],
+                                                             'impact':impact,
+                                                             'diagnosis_rank':i}
         # get successor treatments to signs (record it as a sign/symptom treatment)
-        #    filter by positive relationships (may want to keep negative relationships to show)
+        for sign in record['signs']:
+            for predecessor in self.model.predecessors(sign):
+                if self.model.node[predecessor]['type'] == 'sign':
+                    impact = self.model.edge[sign][predecessor]['impact']
+                    potential_treatments[predecessor] = {'source_type':'sign', 'source':sign, 'impact':impact}
         # get successor treatments to symptoms (record it as a sign/symptom treatment)
-        #   filter by positive relationships (may want to keep negative relationships to show)
+        for symptom in record['signs']:
+            for predecessor in self.model.predecessors(symptom):
+                if self.model.node[predecessor]['type'] == 'symptom':
+                    impact = self.model.edge[symptom][predecessor]['impact']
+                    potential_treatments[predecessor] = {'source_type':'symptom', 'source':symptom, 'impact':impact}
+        '''
+        nodes = set()
+        potential_greatments_dict = dict()
+        # for the top (diagnoses_to_consider) diagnoses:
+        for i in range(diagnoses_to_consider):
+            #   get successor treatments (record it as a diagnosis treatment)
+            for predecessor in self.model.predecessors(L[i]):
+                if self.model.node[predecessor]['type'] == 'treatment':
+                    potential_greatments_dict[predecessor] = {'source':L[i], 'diagnosis_rank':i}
+                    nodes.add(predecessor)
+
+        # get successor treatments to signs (record it as a sign/symptom treatment)
+        for sign in record['signs']:
+            for predecessor in self.model.predecessors(sign):
+                if self.model.node[predecessor]['type'] == 'sign':
+                    impact = self.model.edge[sign][predecessor]['impact']
+                    potential_greatments_dict[predecessor] = {'source':sign, 'impact':impact}
+                    nodes.add(predecessor)
+        # get successor treatments to symptoms (record it as a sign/symptom treatment)
+        for symptom in record['signs']:
+            for predecessor in self.model.predecessors(symptom):
+                if self.model.node[predecessor]['type'] == 'symptom':
+                    impact = self.model.edge[symptom][predecessor]['impact']
+                    potential_greatments_dict[predecessor] = {'source':symptom, 'impact':impact}
+                    nodes.add(predecessor)
+        # get negative impacts on potential diagnoses
+        for i in range(diagnoses_to_consider, len(L)):
+            #   get successor treatments (record it as a diagnosis treatment)
+            for predecessor in self.model.predecessors(L[i]):
+                impact = self.model.edge[L[i]][predecessor]['impact']
+                if impact < 0 and predecessor in nodes:
+                    potential_greatments_dict[predecessor] = {'source_type':'diagnosis',
+                                                         'source':L[i], 'diagnosis_rank':i}
+                    nodes.add(predecessor)
+
+        potential_treatments_graph = self.model.subgraph(nodes)
+
+        # Try and assemble treatments that represent cures
+        if treatment_type == 'cures':
+            #TODO:
+            pass
+
+        # finds the single, best, treatment
+        elif treatment_type == 'top':
+            #TODO:
+            pass
+
+        #  attempts to find the most efficient/best coverage of the top diagnoses_to_consider diagnoses
+        elif treatment_type == 'coverage':
+            #TODO:
+            pass
+
         # for each potential_treatment:
         #   get all predecessors with negative relationships
         #   if the negative relationship is in the top (SOME CUTOFF.  SAY 99.7%): drop it
