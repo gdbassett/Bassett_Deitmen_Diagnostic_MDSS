@@ -53,7 +53,7 @@ CONFIG_FILE = "./mdss.cfg"
 FLASK_DEBUG = True
 HOST = '0.0.0.0'
 PORT = 8080
-MODEL_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/code/practicum"
+MODEL_DIR = "/Users/v685573/OneDrive/Documents/MSIA5243/practicum/code/practicum"
 TRAIN_RECORDS = 900000  # Number of records to use in training the model.  I'd recommend 100-1000 times the number of diagnoses
 TEST_RECORDS = 10000  # Number of records to use to use in testing the model
 
